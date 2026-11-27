@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAMS — Ekub & Association Management System</title>
+<meta name="description" content="A fully functional, browser-based Ekub and Association Management System — members, schemes, contributions, draws, distributions, and a self-balancing double-entry ledger.">
+<style>
+:root{
+  --navy:#0F2A43; --navy-l:#1B3A57; --navy-d:#0a1f33; --teal:#1F7A8C;
+  --emerald:#2F9E6B; --emerald-d:#248055; --bg:#F4F6F8; --card:#FFFFFF;
+  --border:#D6DEE6; --text:#1A2230; --muted:#6B7785; --danger:#C0392B;
+  --warn:#B7791F; --shadow:0 2px 10px rgba(15,42,67,.08);
+  --shadow-lg:0 10px 30px rgba(15,42,67,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--text);background:var(--bg);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:1rem}
+code,.mono{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+.hidden{display:none!important}
+
+/* ===== Layout ===== */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:var(--navy);color:#cdd7e0;position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;padding:0;overflow-y:auto}
+.brand{padding:1.2rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand .logo{font-size:1.15rem;font-weight:800;color:#fff;letter-spacing:.02em}
+.brand .logo span{color:var(--emerald)}
+.brand .sub{font-size:.72rem;color:#8aa0b8;margin-top:.15rem;text-transform:uppercase;letter-spacing:.08em}
+.nav{padding:.6rem 0;flex:1}
+.nav a{display:flex;align-items:center;gap:.6rem;padding:.6rem 1.1rem;color:#b9c6d6;
+  font-size:.92rem;border-left:3px solid transparent;cursor:pointer}
+.nav a:hover{background:rgba(255,255,255,.05);color:#fff;text-decoration:none}
+.nav a.active{background:rgba(47,158,107,.12);color:#fff;border-left-color:var(--emerald)}
+.nav a .ic{width:18px;text-align:center;font-size:1rem}
+.sidebar-foot{padding:.8rem 1.1rem;border-top:1px solid rgba(255,255,255,.08);font-size:.75rem;color:#7d93ab}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:.7rem 1.2rem;
+  display:flex;align-items:center;gap:.8rem;position:sticky;top:0;z-index:20}
+.topbar .burger{display:none;background:none;border:none;font-size:1.3rem;color:var(--navy)}
+.topbar h1{font-size:1.1rem;color:var(--navy);font-weight:700;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .assoc-sel{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:.35rem .5rem;font-size:.85rem;max-width:200px}
+.topbar .usr{font-size:.82rem;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--border);
+  background:var(--card);color:var(--text);padding:.5rem .85rem;border-radius:6px;font-size:.85rem;font-weight:600}
+.btn:hover{border-color:var(--teal)}
+.btn.primary{background:var(--emerald);border-color:var(--emerald);color:#fff}
+.btn.primary:hover{background:var(--emerald-d)}
+.btn.teal{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{padding:.3rem .55rem;font-size:.78rem}
+.content{padding:1.2rem;max-width:1200px;width:100%}
+
+/* ===== Cards / KPIs ===== */
+.grid{display:grid;gap:1rem}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:1rem 1.1rem;box-shadow:var(--shadow)}
+.card h3{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.kpi .val{font-size:1.7rem;font-weight:800;color:var(--navy);margin-top:.2rem}
+.kpi .val.em{color:var(--emerald)} .kpi .val.tl{color:var(--teal)}
+.kpi .sub{font-size:.78rem;color:var(--muted);margin-top:.1rem}
+.section-title{font-size:1.05rem;color:var(--navy);font-weight:700;margin:0 0 .8rem}
+
+/* ===== Tables ===== */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:520px}
+th,td{text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+th{background:var(--navy);color:#fff;font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:none}
+tr:nth-child(even) td{background:#f8fafc}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.twrap{white-space:normal;max-width:240px}
+
+/* ===== Badges ===== */
+.badge{display:inline-block;font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
+.badge.green{background:#e3f5ec;color:var(--emerald-d)}
+.badge.blue{background:#e3eef5;color:var(--teal)}
+.badge.gray{background:#e9edf1;color:var(--muted)}
+.badge.amber{background:#fbf0da;color:var(--warn)}
+.badge.red{background:#fbe5e2;color:var(--danger)}
+
+/* ===== Forms ===== */
+.form-row{display:grid;gap:.7rem 1rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:.8rem}
+.field label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.25rem;font-weight:600}
+.field input,.field select,.field textarea{width:100%;padding:.5rem .6rem;border:1px solid var(--border);
+  border-radius:6px;background:#fff;color:var(--text)}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(31,122,140,.15)}
+.form-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:.4rem}
+.hint{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+
+/* ===== Modal ===== */
+.modal-back{position:fixed;inset:0;background:rgba(10,31,51,.5);display:flex;align-items:flex-start;
+  justify-content:center;padding:5vh 1rem;z-index:100;overflow-y:auto}
+.modal{background:var(--card);border-radius:12px;max-width:560px;width:100%;box-shadow:var(--shadow-lg);
+  animation:rise .15s ease-out}
+@keyframes rise{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+.modal-head{padding:1rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center}
+.modal-head h2{font-size:1.05rem;color:var(--navy);flex:1}
+.modal-head .x{background:none;border:none;font-size:1.3rem;color:var(--muted)}
+.modal-body{padding:1.2rem}
+.modal-foot{padding:.8rem 1.2rem;border-top:1px solid var(--border);display:flex;gap:.6rem;justify-content:flex-end}
+
+/* ===== Toast ===== */
+.toast-wrap{position:fixed;bottom:1rem;right:1rem;z-index:200;display:flex;flex-direction:column;gap:.5rem}
+.toast{background:var(--navy);color:#fff;padding:.7rem 1rem;border-radius:8px;font-size:.85rem;
+  box-shadow:var(--shadow-lg);max-width:340px;animation:rise .15s ease-out;border-left:4px solid var(--emerald)}
+.toast.err{border-left-color:var(--danger)}
+.toast.warn{border-left-color:var(--warn)}
+
+/* ===== Auth ===== */
+.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-l) 100%)}
+.auth-card{background:var(--card);border-radius:14px;max-width:430px;width:100%;padding:2rem;box-shadow:var(--shadow-lg)}
+.auth-card .logo{font-size:1.5rem;font-weight:800;color:var(--navy)}
+.auth-card .logo span{color:var(--emerald)}
+.auth-card .tag{color:var(--muted);font-size:.88rem;margin:.3rem 0 1.3rem}
+.note{background:#eef5f1;border-left:3px solid var(--emerald);padding:.7rem .9rem;border-radius:6px;
+  font-size:.82rem;color:#234;margin:.8rem 0}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted)}
+.empty .ic{font-size:2.4rem;margin-bottom:.5rem}
+.pillrow{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0}
+details.summary-box{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;margin:.6rem 0}
+details.summary-box summary{cursor:pointer;font-weight:700;color:var(--navy)}
+.muted{color:var(--muted)} .small{font-size:.8rem}
+.row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.between{display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.8rem}
+
+/* ===== Responsive ===== */
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:-260px;top:0;width:240px;z-index:50;transition:left .2s;height:100vh}
+  .app.nav-open .sidebar{left:0}
+  .app.nav-open::after{content:"";position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40}
+  .topbar .burger{display:block}
+  .topbar .usr{display:none}
+  .content{padding:.9rem}
+}
+@media (max-width:480px){
+  .topbar .assoc-sel{max-width:130px;font-size:.78rem}
+  .kpi .val{font-size:1.4rem}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="modal-root"></div>
+<div id="toast-root" class="toast-wrap"></div>
+<script>
+/* ===== EAMS — Ekub & Association Management System (client-side app) ===== */
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const fmt=n=>new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n)||0);
+const today=()=>new Date().toISOString().slice(0,10);
+const nowISO=()=>new Date().toISOString();
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY='eams_db_v1'; const SK='eams_session';
+
+const ACCT={CASH:'cash',LIAB:'members_liability',FEE:'fee_income',PEN:'penalty_income'};
+const ACCT_NAME={cash:'Cash (Asset)',members_liability:"Members' Liability",fee_income:'Fee Income',penalty_income:'Penalty Income'};
+const ACCT_KIND={cash:'asset',members_liability:'liability',fee_income:'income',penalty_income:'income'};
+const MODES={traditional_pool:'Traditional Pool',equal_rounds:'Equal Rounds',target_entitlement:'Target Entitlement'};
+const SHARE={full:'Full',half:'Half',quarter:'Quarter',custom:'Custom'};
+
+function initialDb(){return{version:1,settings:{setup:false,adminPin:null,adminName:'',activeAssociationId:null},
+  associations:[],members:[],schemes:[],enrollments:[],contributions:[],draws:[],distributions:[],ledger:[],audit:[]};}
+function loadDb(){try{return JSON.parse(localStorage.getItem(KEY))||initialDb()}catch(e){return initialDb()}}
+function saveDb(){localStorage.setItem(KEY,JSON.stringify(DB))}
+let DB=loadDb();
+function session(){try{return JSON.parse(sessionStorage.getItem(SK))}catch(e){return null}}
+function setSession(s){sessionStorage.setItem(SK,JSON.stringify(s))}
+function clearSession(){sessionStorage.removeItem(SK)}
+
+/* collection helpers */
+function find(coll,id){return DB[coll].find(x=>x.id===id)}
+function activeAssocId(){return DB.settings.activeAssociationId}
+function activeAssoc(){return find('associations',activeAssocId())}
+function assocFilter(arr){return arr.filter(x=>x.association_id===activeAssocId())}
+function memberName(id){const m=find('members',id);return m?m.full_name:'—'}
+function memberNo(id){const m=find('members',id);return m?m.member_no:'—'}
+function schemeName(id){const s=find('schemes',id);return s?s.name:'—'}
+
+function audit(action,refId){DB.audit.push({id:uid(),at:nowISO(),action,ref_id:refId,user:DB.settings.adminName||'admin'});}
+
+/* ===== Double-entry ledger posting ===== */
+function postTx(refType,refId,date,lines,desc){
+  const txid=uid(); const aid=activeAssocId();
+  lines.forEach(l=>{DB.ledger.push({id:uid(),tx_id:txid,association_id:aid,date,account:l.account,
+    debit:+l.debit||0,credit:+l.credit||0,ref_type:refType,ref_id:refId,description:desc});});
+}
+function acctBalances(){
+  const b={cash:0,members_liability:0,fee_income:0,penalty_income:0};
+  assocFilter(DB.ledger).forEach(e=>{b[e.account]=(b[e.account]||0)+(+e.debit)-(+e.credit);});
+  return b;
+}
+function ledgerTotals(){let d=0,c=0;assocFilter(DB.ledger).forEach(e=>{d+=+e.debit;c+=+e.credit;});return{debit:d,credit:c};}
+function cashBalance(){return acctBalances().cash}
+function totalCollected(){return assocFilter(DB.contributions).reduce((s,x)=>s+(+x.amount),0)}
+function totalDistributed(){return assocFilter(DB.distributions).reduce((s,x)=>s+(+x.amount),0)}
+
+/* ===== UI helpers: toast + modal ===== */
+function toast(msg,type){
+  const w=$('#toast-root'); const t=document.createElement('div');
+  t.className='toast'+(type?' '+type:''); t.textContent=msg; w.appendChild(t);
+  setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),320);},2800);
+}
+function openModal(inner){
+  const r=$('#modal-root');
+  r.innerHTML='<div class="modal-back" data-close><div class="modal">'+inner+'</div></div>';
+  document.body.style.overflow='hidden';
+}
+function closeModal(){$('#modal-root').innerHTML='';document.body.style.overflow='';}
+
+/* ===== Members CRUD ===== */
+function nextMemberNo(){let n=0;assocFilter(DB.members).forEach(m=>{const x=parseInt((m.member_no||'').replace(/\D/g,''),10);if(!isNaN(x)&&x>n)n=x;});return 'M'+String(n+1).padStart(4,'0');}
+function addMember(d){const id=uid();DB.members.push({id,association_id:activeAssocId(),member_no:d.member_no||nextMemberNo(),full_name:d.full_name,phone:d.phone||'',email:d.email||'',id_no:d.id_no||'',status:'active',joined_at:today()});audit('member.create',id);saveDb();return id;}
+function updateMember(id,d){const m=find('members',id);if(!m)return;Object.assign(m,d);audit('member.update',id);saveDb();}
+function deleteMember(id){if(DB.enrollments.some(e=>e.member_id===id)){toast('Cannot delete: member is enrolled in a scheme','err');return false;}DB.members=DB.members.filter(m=>m.id!==id);audit('member.delete',id);saveDb();return true;}
+
+/* ===== Schemes CRUD ===== */
+function addScheme(d){const id=uid();DB.schemes.push({id,association_id:activeAssocId(),name:d.name,code:d.code||'',type:d.type||'ekub',distribution_mode:d.distribution_mode||'equal_rounds',round_value:+d.round_value||0,contribution_amount:+d.contribution_amount||0,total_rounds:+d.total_rounds||0,contribution_frequency:d.contribution_frequency||'monthly',start_date:d.start_date||today(),status:'active',drawn_rounds:[],created_at:today()});audit('scheme.create',id);saveDb();return id;}
+function updateScheme(id,d){const s=find('schemes',id);if(!s)return;Object.assign(s,d);audit('scheme.update',id);saveDb();}
+function closeScheme(id){const s=find('schemes',id);if(!s)return;s.status='closed';audit('scheme.close',id);saveDb();}
+
+/* ===== Enrollments ===== */
+function enrollMember(schemeId,memberId,target,shareType){const id=uid();const tgt=+target||0;DB.enrollments.push({id,association_id:activeAssocId(),scheme_id:schemeId,member_id:memberId,share_type:shareType||'custom',target_amount:tgt,remaining_target:tgt,total_received:0,rounds_received:0,status:'active',joined_at:today()});audit('enrollment.create',id);saveDb();return id;}
+function removeEnrollment(id){const e=find('enrollments',id);if(!e)return false;if(e.total_received>0){toast('Cannot remove: member already received a distribution','err');return false;}DB.enrollments=DB.enrollments.filter(x=>x.id!==id);audit('enrollment.delete',id);saveDb();return true;}
+
+/* ===== Contributions ===== */
+function collectRound(schemeId,roundNo){
+  const sch=find('schemes',schemeId);if(!sch||sch.status==='closed')return 0;const rn=+roundNo;
+  // Classic rotating Ekub: every enrolled member contributes every round until the scheme closes.
+  const ens=assocFilter(DB.enrollments).filter(e=>e.scheme_id===schemeId);
+  let made=0;
+  ens.forEach(e=>{
+    if(DB.contributions.some(c=>c.scheme_id===schemeId&&c.member_id===e.member_id&&c.round_no===rn))return;
+    const id=uid(); const amt=sch.contribution_amount;
+    DB.contributions.push({id,association_id:activeAssocId(),scheme_id:schemeId,member_id:e.member_id,round_no:rn,amount:amt,method:'cash',reference:'Round '+rn+' collection',paid_date:today(),status:'paid'});
+    postTx('contribution',id,today(),[{account:ACCT.CASH,debit:amt},{account:ACCT.LIAB,credit:amt}],'Contribution R'+rn+' — '+memberName(e.member_id));
+    made++;
+  });
+  audit('contribution.collectRound',schemeId); saveDb(); return made;
+}
+function addContribution(d){const id=uid();const amt=+d.amount;DB.contributions.push({id,association_id:activeAssocId(),scheme_id:d.scheme_id,member_id:d.member_id,round_no:+d.round_no,amount:amt,method:d.method||'cash',reference:d.reference||'',paid_date:d.paid_date||today(),status:'paid'});postTx('contribution',id,d.paid_date||today(),[{account:ACCT.CASH,debit:amt},{account:ACCT.LIAB,credit:amt}],'Contribution R'+d.round_no+' — '+memberName(d.member_id));audit('contribution.create',id);saveDb();return id;}
+
+/* ===== Draw / distribution engine (3 modes) ===== */
+function runDraw(schemeId,roundNo){
+  const sch=find('schemes',schemeId); if(!sch){toast('Scheme not found','err');return;}
+  if(sch.status==='closed'){toast('Scheme is closed','err');return;}
+  const rn=+roundNo;
+  const rc=assocFilter(DB.contributions).filter(c=>c.scheme_id===schemeId&&c.round_no===rn);
+  const pool=rc.reduce((s,c)=>s+(+c.amount),0);
+  if(pool<=0){toast('No contributions for round '+rn+'. Collect the round first.','warn');return;}
+  if((sch.drawn_rounds||[]).includes(rn)){toast('Round '+rn+' already drawn','warn');return;}
+  const paidIds=new Set(rc.map(c=>c.member_id));
+  let eligible=assocFilter(DB.enrollments).filter(e=>e.scheme_id===schemeId&&e.status==='active'&&e.remaining_target>0&&paidIds.has(e.member_id));
+  if(!eligible.length){toast('No eligible members (paid members all reached target)','warn');return;}
+  const payouts=[];
+  if(sch.distribution_mode==='traditional_pool'){
+    const w=eligible[Math.floor(Math.random()*eligible.length)];
+    payouts.push({member_id:w.member_id,amount:Math.min(pool,w.remaining_target)});
+  } else if(sch.distribution_mode==='equal_rounds'){
+    let rem=pool; const remT={}; eligible.forEach(e=>remT[e.id]=e.remaining_target);
+    while(rem>0){
+      const elig=eligible.filter(e=>remT[e.id]>0);
+      if(!elig.length)break;
+      const w=elig[Math.floor(Math.random()*elig.length)];
+      const amt=Math.min(sch.round_value,remT[w.id],rem);
+      if(amt<=0)break;
+      payouts.push({member_id:w.member_id,amount:amt}); remT[w.id]-=amt; rem-=amt;
+    }
+  } else { /* target_entitlement */
+    let rem=pool; const sorted=[...eligible].sort((a,b)=>a.remaining_target-b.remaining_target);
+    for(const w of sorted){ if(rem<=0)break; const amt=Math.min(w.remaining_target,rem); if(amt<=0)continue; payouts.push({member_id:w.member_id,amount:amt}); rem-=amt; }
+  }
+  const date=today();
+  payouts.forEach(p=>{
+    const en=DB.enrollments.find(e=>e.scheme_id===schemeId&&e.member_id===p.member_id);
+    const drawId=uid();
+    DB.draws.push({id:drawId,association_id:activeAssocId(),scheme_id:schemeId,round_no:rn,draw_date:date,winner_id:p.member_id,amount:p.amount,mode:sch.distribution_mode});
+    const distId=uid();
+    DB.distributions.push({id:distId,association_id:activeAssocId(),scheme_id:schemeId,draw_id:drawId,member_id:p.member_id,round_no:rn,amount:p.amount,distributed_date:date,status:'paid'});
+    postTx('distribution',distId,date,[{account:ACCT.LIAB,debit:p.amount},{account:ACCT.CASH,credit:p.amount}],'Distribution R'+rn+' — '+memberName(p.member_id));
+    if(en){en.total_received+=p.amount; en.remaining_target=Math.max(0,en.remaining_target-p.amount); en.rounds_received+=1; if(en.remaining_target<=0)en.status='completed';}
+  });
+  if(!sch.drawn_rounds)sch.drawn_rounds=[];
+  sch.drawn_rounds.push(rn);
+  const activeLeft=assocFilter(DB.enrollments).filter(e=>e.scheme_id===schemeId&&e.status==='active').length;
+  if(activeLeft===0||sch.drawn_rounds.length>=sch.total_rounds)sch.status='closed';
+  audit('draw.run',schemeId); saveDb();
+  toast('Round '+rn+' drawn: '+payouts.length+' winner(s), ETB '+fmt(payouts.reduce((s,p)=>s+p.amount,0)));
+}
+/* ===== Modal form helper ===== */
+function modalForm(title,bodyHtml,submitLabel,formKey,idAttr){
+  return `<div class="modal-head"><h2>${esc(title)}</h2><button type="button" class="x" data-action="modal.close">×</button></div>
+    <form data-form="${formKey}" data-id="${idAttr||''}"><div class="modal-body">${bodyHtml}</div>
+    <div class="modal-foot"><button type="button" class="btn ghost" data-action="modal.close">Cancel</button>
+    <button type="submit" class="btn primary">${esc(submitLabel)}</button></div></form>`;
+}
+function formVals(form){const o={};new FormData(form).forEach((v,k)=>o[k]=v);return o;}
+function schemeBadge(s){return s.status==='closed'?'<span class="badge gray">Closed</span>':'<span class="badge green">Active</span>';}
+
+/* ===== Auth: setup + login ===== */
+function viewSetup(){
+  return `<div class="auth"><div class="auth-card">
+    <div class="logo">E<span>AMS</span></div><div class="tag">Ekub &amp; Association Management System</div>
+    <div class="note">First-time setup: create your association and an administrator PIN. All data stays in this browser.</div>
+    <form data-form="setup"><div class="form-row">
+      <div class="field"><label>Association Name *</label><input name="assoc_name" required placeholder="Unity Iqub Association"></div>
+      <div class="field"><label>Code</label><input name="assoc_code" placeholder="UNI"></div>
+      <div class="field"><label>Currency</label><select name="currency"><option>ETB</option><option>USD</option><option>KES</option><option>NGN</option></select></div>
+      <div class="field"><label>Admin Name *</label><input name="admin_name" required></div>
+      <div class="field"><label>Access PIN (4-6 digits) *</label><input name="pin" required pattern="[0-9]{4,6}" inputmode="numeric"></div>
+      <div class="field"><label>Phone</label><input name="phone"></div>
+      <div class="field"><label>Email</label><input name="email"></div>
+      <div class="field"><label>Address</label><input name="address"></div>
+    </div><div class="form-actions"><button class="btn primary" type="submit">Create &amp; Enter</button></div></form>
+    <div class="small muted" style="margin-top:1rem">Or <a data-action="settings.demo">load demonstration data</a> to explore immediately.</div>
+  </div></div>`;
+}
+function viewLogin(){
+  const an=DB.associations.find(a=>a.id===DB.settings.activeAssociationId)||DB.associations[0];
+  return `<div class="auth"><div class="auth-card">
+    <div class="logo">E<span>AMS</span></div><div class="tag">${esc(an?an.name:'')}</div>
+    <form data-form="login"><div class="field"><label>Access PIN</label><input name="pin" id="loginPin" required pattern="[0-9]{4,6}" inputmode="numeric"></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Enter</button></div></form>
+    <div class="small muted" style="margin-top:1rem">Admin: ${esc(DB.settings.adminName||'')}</div>
+  </div></div>`;
+}
+function doSetup(v){
+  const aid=uid();
+  DB.associations.push({id:aid,name:v.assoc_name,code:v.assoc_code||'',currency:v.currency||'ETB',address:v.address||'',phone:v.phone||'',email:v.email||'',created_at:today()});
+  DB.settings={setup:true,adminPin:String(v.pin),adminName:v.admin_name,activeAssociationId:aid};
+  audit('system.setup',aid); saveDb(); setSession({loggedIn:true,at:nowISO()});
+  toast('Welcome, '+v.admin_name);
+}
+function doLogin(v){if(String(v.pin)===String(DB.settings.adminPin)){setSession({loggedIn:true,at:nowISO()});toast('Welcome back');}else{toast('Wrong PIN','err');}}
+
+/* ===== App shell + router ===== */
+const NAV=[{r:'dashboard',label:'Dashboard',ic:'▦'},{r:'members',label:'Members',ic:'👤'},{r:'schemes',label:'Schemes',ic:'🏧'},{r:'contributions',label:'Contributions',ic:'💰'},{r:'ledger',label:'Ledger',ic:'📚'},{r:'reports',label:'Reports',ic:'📊'},{r:'settings',label:'Settings',ic:'⚙'}];
+function currentRoute(){return (location.hash.replace(/^#\/?/,'')||'dashboard');}
+function navigate(r){location.hash='#/'+r;}
+function viewApp(){
+  const r=currentRoute();
+  const navHtml=NAV.map(n=>`<a data-nav="${n.r}" class="${r.startsWith(n.r)?'active':''}"><span class="ic">${n.ic}</span>${n.label}</a>`).join('');
+  return `<div class="app" id="appShell">
+    <aside class="sidebar"><div class="brand"><div class="logo">E<span>AMS</span></div><div class="sub">Ekub &amp; Assoc. Mgmt</div></div>
+      <nav class="nav">${navHtml}</nav>
+      <div class="sidebar-foot">v1.0 · local data<br>${esc(DB.settings.adminName||'admin')}</div></aside>
+    <div class="main"><header class="topbar">
+      <button class="burger" id="burger">☰</button><h1 id="pageTitle">—</h1>
+      <select class="assoc-sel" id="assocSwitch">${DB.associations.map(a=>`<option value="${a.id}" ${a.id===activeAssocId()?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
+      <span class="usr">${esc(DB.settings.adminName||'admin')}</span>
+      <button class="btn ghost sm" data-action="app.logout">Logout</button>
+    </header><main class="content"><div id="view"></div></main></div></div>`;
+}
+function renderView(){
+  const r=currentRoute(); const p=r.split('/');
+  let title='Dashboard', html=viewDashboard();
+  if(p[0]==='members'){title='Members';html=viewMembers();}
+  else if(p[0]==='schemes'){title='Schemes';html=viewSchemes();}
+  else if(p[0]==='scheme'){title='Scheme Detail';html=viewSchemeDetail(p[1]);}
+  else if(p[0]==='contributions'){title='Contributions';html=viewContributions();}
+  else if(p[0]==='ledger'){title='Ledger & Books';html=viewLedger();}
+  else if(p[0]==='reports'){title='Reports';html=viewReports();}
+  else if(p[0]==='settings'){title='Settings';html=viewSettings();}
+  const v=$('#view'); if(v)v.innerHTML=html;
+  const t=$('#pageTitle'); if(t)t.textContent=title;
+  $$('.nav a[data-nav]').forEach(a=>a.classList.toggle('active',r.startsWith(a.dataset.nav)));
+}
+function afterRender(){
+  $('#burger').onclick=()=>$('#appShell').classList.toggle('nav-open');
+  $$('.nav a[data-nav]').forEach(a=>a.onclick=e=>{e.preventDefault();$('#appShell').classList.remove('nav-open');navigate(a.dataset.nav);});
+  const sw=$('#assocSwitch'); if(sw)sw.onchange=e=>{DB.settings.activeAssociationId=e.target.value;saveDb();navigate('dashboard');render();};
+  renderView();
+}
+
+/* ===== Views: dashboard / members / schemes / scheme detail ===== */
+function viewDashboard(){
+  const b=acctBalances(), cur=activeAssoc()?(activeAssoc().currency||'ETB'):'ETB';
+  const memN=assocFilter(DB.members).length;
+  const schActive=assocFilter(DB.schemes).filter(s=>s.status==='active').length;
+  const enrN=assocFilter(DB.enrollments).length;
+  const recent=assocFilter(DB.ledger).slice(-8).reverse();
+  const emp=memN===0&&assocFilter(DB.schemes).length===0;
+  return `<section><div class="between"><div class="section-title" style="margin:0">Overview</div>
+    <div class="row"><button class="btn primary sm" data-action="member.add">+ Member</button>
+    <button class="btn teal sm" data-action="scheme.add">+ Scheme</button>
+    ${emp?'<button class="btn sm" data-action="settings.demo">Load demo</button>':''}</div></div>
+  <div class="grid kpis">
+    <div class="card kpi"><h3>Cash Balance</h3><div class="val em">${fmt(b.cash)}</div><div class="sub">${esc(cur)}</div></div>
+    <div class="card kpi"><h3>Total Collected</h3><div class="val tl">${fmt(totalCollected())}</div><div class="sub">Contributions</div></div>
+    <div class="card kpi"><h3>Total Distributed</h3><div class="val">${fmt(totalDistributed())}</div><div class="sub">To winners</div></div>
+    <div class="card kpi"><h3>Members' Liability</h3><div class="val">${fmt(b.members_liability)}</div><div class="sub">Owed to members</div></div>
+    <div class="card kpi"><h3>Members</h3><div class="val">${memN}</div><div class="sub">${enrN} enrollments</div></div>
+    <div class="card kpi"><h3>Active Schemes</h3><div class="val">${schActive}</div><div class="sub">${assocFilter(DB.schemes).length} total</div></div>
+  </div>
+  <details class="summary-box" open><summary>Resolved Distribution Model</summary>
+    <p class="small muted" style="margin-top:.4rem">Each scheme selects one of three modes: <b>Traditional Pool</b> (full round pool to one winner), <b>Equal Rounds</b> (fixed round_value per winner; members win until their target is met), or <b>Target Entitlement</b> (min of remaining target and available pool). The engine pays out exactly the round's collected pool, so total distributed = total collected and the ledger balances by construction.</p>
+  </details>
+  <div class="section-title" style="margin-top:1.2rem">Recent Ledger</div>
+  ${recent.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th>Description</th></tr></thead><tbody>
+    ${recent.map(e=>`<tr><td>${e.date}</td><td>${esc(ACCT_NAME[e.account]||e.account)}</td><td class="num">${e.debit?fmt(e.debit):''}</td><td class="num">${e.credit?fmt(e.credit):''}</td><td class="twrap">${esc(e.description)}</td></tr>`).join('')}</tbody></table></div>`
+    :`<div class="empty"><div class="ic">📭</div>No transactions yet. ${emp?'Load demo data or add members to begin.':'Record a contribution to start the ledger.'}</div>`}
+  </section>`;
+}
+function viewMembers(){
+  const ms=assocFilter(DB.members);
+  return `<section><div class="between"><div class="section-title" style="margin:0">Members <span class="muted small">(${ms.length})</span></div>
+    <div class="row"><input id="memSearch" placeholder="Search..." class="assoc-sel" style="max-width:200px"><button class="btn primary sm" data-action="member.add">+ Add Member</button></div></div>
+  ${ms.length?`<div class="table-wrap"><table id="memTable"><thead><tr><th>No.</th><th>Name</th><th>Phone</th><th>Email</th><th>ID</th><th>Enrolled</th><th></th></tr></thead><tbody>
+    ${ms.map(m=>{const en=assocFilter(DB.enrollments).filter(e=>e.member_id===m.id).length;return `<tr><td>${esc(m.member_no)}</td><td>${esc(m.full_name)}</td><td>${esc(m.phone||'—')}</td><td>${esc(m.email||'—')}</td><td>${esc(m.id_no||'—')}</td><td>${en?`<span class="badge blue">${en}</span>`:'<span class="badge gray">0</span>'}</td>
+      <td><button class="btn sm" data-action="member.edit" data-id="${m.id}">Edit</button> <button class="btn sm danger" data-action="member.del" data-id="${m.id}">Del</button></td></tr>`;}).join('')}</tbody></table></div>`
+    :`<div class="empty"><div class="ic">👤</div>No members yet.<br><button class="btn primary sm" data-action="member.add" style="margin-top:.8rem">+ Add Member</button> or <a data-action="settings.demo">load demo data</a></div>`}
+  </section>`;
+}
+function viewSchemes(){
+  const ss=assocFilter(DB.schemes);
+  return `<section><div class="between"><div class="section-title" style="margin:0">Schemes <span class="muted small">(${ss.length})</span></div>
+    <button class="btn primary sm" data-action="scheme.add">+ Add Scheme</button></section>
+  ${ss.length?(`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Mode</th><th class="num">Round Value</th><th class="num">Contrib.</th><th class="num">Rounds</th><th class="num">Collected</th><th class="num">Distributed</th><th>Status</th><th></th></tr></thead><tbody>
+    ${ss.map(s=>{const col=assocFilter(DB.contributions).filter(c=>c.scheme_id===s.id).reduce((a,c)=>a+(+c.amount),0);const dist=assocFilter(DB.distributions).filter(d=>d.scheme_id===s.id).reduce((a,d)=>a+(+d.amount),0);const drawn=(s.drawn_rounds||[]).length;return `<tr>
+      <td><a data-action="scheme.open" data-id="${s.id}">${esc(s.name)}</a></td>
+      <td><span class="badge blue">${esc(MODES[s.distribution_mode])}</span></td>
+      <td class="num">${fmt(s.round_value)}</td><td class="num">${fmt(s.contribution_amount)}</td><td class="num">${drawn}/${s.total_rounds}</td>
+      <td class="num">${fmt(col)}</td><td class="num">${fmt(dist)}</td><td>${schemeBadge(s)}</td>
+      <td><button class="btn sm" data-action="scheme.open" data-id="${s.id}">Open</button></td></tr>`;}).join('')}</tbody></table></div>`)
+    :`<div class="empty"><div class="ic">🏧</div>No schemes yet.<br><button class="btn primary sm" data-action="scheme.add" style="margin-top:.8rem">+ Add Scheme</button> or <a data-action="settings.demo">load demo data</a></div>`}
+  </section>`;
+}
+function viewSchemeDetail(id){
+  const s=find('schemes',id); if(!s)return '<div class="empty">Scheme not found.</div>';
+  const ens=assocFilter(DB.enrollments).filter(e=>e.scheme_id===id);
+  const col=assocFilter(DB.contributions).filter(c=>c.scheme_id===id).reduce((a,c)=>a+(+c.amount),0);
+  const dist=assocFilter(DB.distributions).filter(d=>d.scheme_id===id).reduce((a,d)=>a+(+d.amount),0);
+  const drawn=s.drawn_rounds||[];
+  let rows='';
+  for(let r=1;r<=s.total_rounds;r++){
+    const pool=assocFilter(DB.contributions).filter(c=>c.scheme_id===id&&c.round_no===r).reduce((a,c)=>a+(+c.amount),0);
+    const isDrawn=drawn.includes(r);
+    const winners=assocFilter(DB.draws).filter(d=>d.scheme_id===id&&d.round_no===r).map(d=>`${esc(memberName(d.winner_id))} (${fmt(d.amount)})`).join(', ')||'—';
+    const acts=(!isDrawn&&s.status==='active')?`<button class="btn sm teal" data-action="round.collect" data-id="${id}" data-round="${r}">Collect</button> <button class="btn sm primary" data-action="round.draw" data-id="${id}" data-round="${r}">Draw</button>`:'';
+    rows+=`<tr><td>R${r}</td><td class="num">${fmt(pool)}</td><td>${isDrawn?'<span class="badge green">Drawn</span>':'<span class="badge amber">Pending</span>'}</td><td class="twrap">${winners}</td><td>${acts}</td></tr>`;
+  }
+  return `<section><div class="between"><div><div class="section-title" style="margin:0">${esc(s.name)} ${schemeBadge(s)}</div>
+    <div class="small muted">${esc(MODES[s.distribution_mode])} · round value ${fmt(s.round_value)} · contribution ${fmt(s.contribution_amount)} · ${s.total_rounds} rounds · started ${s.start_date}</div></div>
+    <div class="row"><button class="btn sm" data-action="scheme.edit" data-id="${id}">Edit</button>
+    ${s.status==='active'?`<button class="btn sm danger" data-action="scheme.close" data-id="${id}">Close</button>`:''}</div></div>
+    <div class="grid kpis" style="margin-bottom:1rem">
+      <div class="card kpi"><h3>Collected</h3><div class="val tl">${fmt(col)}</div></div>
+      <div class="card kpi"><h3>Distributed</h3><div class="val em">${fmt(dist)}</div></div>
+      <div class="card kpi"><h3>Pool Remaining</h3><div class="val">${fmt(col-dist)}</div></div>
+      <div class="card kpi"><h3>Enrolled</h3><div class="val">${ens.length}</div><div class="sub">${ens.filter(e=>e.status==='active').length} active · ${ens.filter(e=>e.status==='completed').length} done</div></div>
+    </div>
+    <div class="between"><div class="section-title" style="margin:0">Enrolled Members</div>
+      ${s.status==='active'?`<button class="btn primary sm" data-action="enroll.add" data-id="${id}">+ Enroll Member</button>`:''}</div>
+    ${ens.length?`<div class="table-wrap" style="margin-bottom:1rem"><table><thead><tr><th>Member</th><th>Share</th><th class="num">Target</th><th class="num">Received</th><th class="num">Remaining</th><th class="num">Won</th><th>Status</th><th></th></tr></thead><tbody>
+      ${ens.map(e=>`<tr><td>${esc(memberName(e.member_id))}</td><td><span class="badge gray">${esc(SHARE[e.share_type]||e.share_type)}</span></td><td class="num">${fmt(e.target_amount)}</td><td class="num">${fmt(e.total_received)}</td><td class="num">${fmt(e.remaining_target)}</td><td class="num">${e.rounds_received}</td><td>${e.status==='completed'?'<span class="badge green">Completed</span>':'<span class="badge blue">Active</span>'}</td><td>${e.total_received>0?'':`<button class="btn sm danger" data-action="enroll.del" data-id="${e.id}">Remove</button>`}</td></tr>`).join('')}</tbody></table></div>`
+      :'<div class="empty small">No members enrolled yet.</div>'}
+    <div class="section-title">Rounds</div>
+    <div class="table-wrap"><table><thead><tr><th>Round</th><th class="num">Pool</th><th>Status</th><th>Winner(s)</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>`;
+}
+
+/* ===== Form modals ===== */
+function openMemberForm(id){
+  const m=id?find('members',id):null;
+  const body=`<div class="form-row">
+    <div class="field"><label>Member No.</label><input name="member_no" value="${m?esc(m.member_no):nextMemberNo()}"></div>
+    <div class="field"><label>Full Name *</label><input name="full_name" required value="${m?esc(m.full_name):''}"></div>
+    <div class="field"><label>Phone</label><input name="phone" value="${m?esc(m.phone):''}"></div>
+    <div class="field"><label>Email</label><input name="email" value="${m?esc(m.email):''}"></div>
+    <div class="field"><label>ID / Passport No.</label><input name="id_no" value="${m?esc(m.id_no):''}"></div>
+  </div>`;
+  openModal(modalForm(m?'Edit Member':'New Member',body,'Save','member',id||''));
+}
+function openSchemeForm(id){
+  const s=id?find('schemes',id):{distribution_mode:'equal_rounds',contribution_frequency:'monthly',total_rounds:8,type:'ekub',start_date:today()};
+  const body=`<div class="form-row">
+    <div class="field"><label>Name *</label><input name="name" required value="${s.name?esc(s.name):''}"></div>
+    <div class="field"><label>Code</label><input name="code" value="${s.code?esc(s.code):''}"></div>
+    <div class="field"><label>Type</label><select name="type"><option value="ekub" ${s.type==='ekub'?'selected':''}>Ekub (Rotating)</option><option value="savings" ${s.type==='savings'?'selected':''}>Savings</option></select></div>
+    <div class="field"><label>Distribution Mode</label><select name="distribution_mode">${Object.entries(MODES).map(([k,v])=>`<option value="${k}" ${s.distribution_mode===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="field"><label>Round Value (per winner)</label><input name="round_value" type="number" step="0.01" value="${s.round_value||''}"></div>
+    <div class="field"><label>Contribution (per member/round)</label><input name="contribution_amount" type="number" step="0.01" value="${s.contribution_amount||''}"></div>
+    <div class="field"><label>Total Rounds</label><input name="total_rounds" type="number" value="${s.total_rounds||''}"></div>
+    <div class="field"><label>Frequency</label><select name="contribution_frequency">${['monthly','weekly','biweekly'].map(f=>`<option ${s.contribution_frequency===f?'selected':''}>${f}</option>`).join('')}</select></div>
+    <div class="field"><label>Start Date</label><input name="start_date" type="date" value="${s.start_date||today()}"></div>
+  </div><div class="hint">Balanced classic Ekub: N members × contribution × rounds = sum of targets. e.g. 8 members, contribution 1,000, 8 rounds → each target 8,000.</div>`;
+  openModal(modalForm(id?'Edit Scheme':'New Scheme',body,'Save','scheme',id||''));
+}
+function openEnrollForm(schemeId){
+  const s=find('schemes',schemeId);
+  const ens=assocFilter(DB.enrollments).filter(e=>e.scheme_id===schemeId);
+  const avail=assocFilter(DB.members).filter(m=>!ens.some(e=>e.member_id===m.id));
+  if(!avail.length){toast('All members already enrolled','warn');return;}
+  const defTgt=s?(s.round_value*s.total_rounds):'';
+  const body=`<div class="form-row">
+    <div class="field"><label>Member *</label><select name="member_id">${avail.map(m=>`<option value="${m.id}">${esc(m.member_no)} — ${esc(m.full_name)}</option>`).join('')}</select></div>
+    <div class="field"><label>Share Type</label><select name="share_type">${Object.entries(SHARE).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div class="field"><label>Target Amount *</label><input name="target_amount" type="number" step="0.01" value="${defTgt}" required></div>
+  </div><input type="hidden" name="scheme_id" value="${schemeId}">`;
+  openModal(modalForm('Enroll Member',body,'Enroll','enroll',''));
+}
+function openContributionForm(){
+  const ss=assocFilter(DB.schemes); if(!ss.length){toast('Create a scheme first','warn');return;}
+  const body=`<div class="form-row">
+    <div class="field"><label>Scheme *</label><select name="scheme_id" id="contribSch">${ss.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>Member *</label><select name="member_id" id="contribMem"></select></div>
+    <div class="field"><label>Round No.</label><input name="round_no" type="number" value="1" min="1"></div>
+    <div class="field"><label>Amount *</label><input name="amount" type="number" step="0.01" required></div>
+    <div class="field"><label>Date</label><input name="paid_date" type="date" value="${today()}"></div>
+    <div class="field"><label>Method</label><select name="method">${['cash','bank','mobile'].map(m=>`<option>${m}</option>`).join('')}</select></div>
+    <div class="field"><label>Reference</label><input name="reference"></div>
+  </div>`;
+  openModal(modalForm('Record Contribution',body,'Save','contribution',''));
+  refreshContribMembers(); const sel=$('#contribSch'); if(sel)sel.onchange=refreshContribMembers;
+}
+function refreshContribMembers(){
+  const sel=$('#contribSch'); if(!sel)return; const sid=sel.value;
+  const ms=assocFilter(DB.enrollments).filter(e=>e.scheme_id===sid).map(e=>find('members',e.member_id)).filter(Boolean);
+  const m=$('#contribMem'); if(m)m.innerHTML=ms.length?ms.map(x=>`<option value="${x.id}">${esc(x.member_no)} — ${esc(x.full_name)}</option>`).join(''):'<option>(no enrolled members)</option>';
+}
+/* ===== Views: contributions / ledger / reports / settings ===== */
+function viewContributions(){
+  const cs=assocFilter(DB.contributions).slice().sort((a,b)=>String(b.paid_date).localeCompare(a.paid_date)||(b.round_no-a.round_no));
+  return `<section><div class="between"><div class="section-title" style="margin:0">Contributions <span class="muted small">(${cs.length})</span></div>
+    <button class="btn primary sm" data-action="contrib.add">+ Record Contribution</button></div>
+  ${cs.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Scheme</th><th>Member</th><th class="num">Round</th><th class="num">Amount</th><th>Method</th><th>Reference</th></tr></thead><tbody>
+    ${cs.map(c=>`<tr><td>${c.paid_date}</td><td>${esc(schemeName(c.scheme_id))}</td><td>${esc(memberName(c.member_id))}</td><td class="num">${c.round_no}</td><td class="num">${fmt(c.amount)}</td><td>${esc(c.method||'cash')}</td><td class="twrap">${esc(c.reference||'—')}</td></tr>`).join('')}</tbody></table></div>`
+    :`<div class="empty"><div class="ic">💰</div>No contributions yet.<br><button class="btn primary sm" data-action="contrib.add" style="margin-top:.8rem">+ Record Contribution</button></div>`}
+  </section>`;
+}
+function viewLedger(){
+  const b=acctBalances(), tot=ledgerTotals();
+  const entries=assocFilter(DB.ledger).slice().sort((a,b)=>String(b.date).localeCompare(a.date)||String(b.id).localeCompare(a.id));
+  const accts=[['cash','Cash (Asset)','asset'],['members_liability',"Members' Liability",'liability'],['fee_income','Fee Income','income'],['penalty_income','Penalty Income','income']];
+  const tb=accts.map(([k,n,kind])=>{let d=0,c=0;assocFilter(DB.ledger).filter(e=>e.account===k).forEach(e=>{d+=+e.debit;c+=+e.credit;});return `<tr><td>${esc(n)}</td><td>${esc(kind)}</td><td class="num">${fmt(d)}</td><td class="num">${fmt(c)}</td><td class="num">${fmt(d-c)}</td></tr>`;}).join('');
+  const assets=b.cash, liabilities=-b.members_liability, income=-(b.fee_income+b.penalty_income);
+  const bal1=Math.abs(tot.debit-tot.credit)<0.001, bal2=Math.abs(assets-(liabilities+income))<0.001;
+  return `<section><div class="section-title">Trial Balance</div>
+  <div class="table-wrap"><table><thead><tr><th>Account</th><th>Type</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Net (Dr−Cr)</th></tr></thead><tbody>${tb}
+    <tr style="font-weight:700;background:#eef5f1"><td>Total</td><td></td><td class="num">${fmt(tot.debit)}</td><td class="num">${fmt(tot.credit)}</td><td class="num">${fmt(tot.debit-tot.credit)}</td></tr></tbody></table></div>
+  <div class="small" style="margin:.4rem 0 1rem">${bal1?'<span class="badge green">✓ Balanced — total debits = total credits</span>':'<span class="badge red">Out of balance</span>'}</div>
+  <div class="section-title">Balance Sheet</div>
+  <div class="table-wrap"><table><thead><tr><th>Section</th><th>Account</th><th class="num">Amount</th></tr></thead><tbody>
+    <tr><td>Assets</td><td>Cash</td><td class="num">${fmt(assets)}</td></tr>
+    <tr><td>Liabilities</td><td>Members' Liability</td><td class="num">${fmt(liabilities)}</td></tr>
+    <tr><td>Income</td><td>Fee + Penalty Income</td><td class="num">${fmt(income)}</td></tr>
+    <tr style="font-weight:700;background:#eef5f1"><td colspan="2">Assets − (Liabilities + Income)</td><td class="num">${fmt(assets-liabilities-income)}</td></tr></tbody></table></div>
+  <div class="small" style="margin:.4rem 0 1rem">${bal2?'<span class="badge green">✓ Balanced — Assets = Liabilities + Income</span>':'<span class="badge red">Out of balance</span>'}</div>
+  <div class="section-title">Ledger Entries <span class="muted small">(${entries.length})</span></div>
+  ${entries.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th>Description</th></tr></thead><tbody>
+    ${entries.map(e=>`<tr><td>${e.date}</td><td>${esc(ACCT_NAME[e.account]||e.account)}</td><td class="num">${e.debit?fmt(e.debit):''}</td><td class="num">${e.credit?fmt(e.credit):''}</td><td class="twrap">${esc(e.description)}</td></tr>`).join('')}</tbody></table></div>`
+    :'<div class="empty small">No ledger entries.</div>'}
+  </section>`;
+}
+function viewReports(){
+  const ss=assocFilter(DB.schemes);
+  const schRows=ss.map(s=>{const col=assocFilter(DB.contributions).filter(c=>c.scheme_id===s.id).reduce((a,c)=>a+(+c.amount),0);const dist=assocFilter(DB.distributions).filter(d=>d.scheme_id===s.id).reduce((a,d)=>a+(+d.amount),0);const ens=assocFilter(DB.enrollments).filter(e=>e.scheme_id===s.id);return `<tr><td>${esc(s.name)}</td><td>${esc(MODES[s.distribution_mode])}</td><td class="num">${ens.length}</td><td class="num">${ens.filter(e=>e.status==='completed').length}</td><td class="num">${fmt(col)}</td><td class="num">${fmt(dist)}</td><td class="num">${fmt(col-dist)}</td><td>${schemeBadge(s)}</td></tr>`;}).join('');
+  const ms=assocFilter(DB.members);
+  const memStmt=ms.map(m=>{const paid=assocFilter(DB.contributions).filter(c=>c.member_id===m.id).reduce((a,c)=>a+(+c.amount),0);const recv=assocFilter(DB.distributions).filter(d=>d.member_id===m.id).reduce((a,d)=>a+(+d.amount),0);return `<tr><td>${esc(m.member_no)}</td><td>${esc(m.full_name)}</td><td class="num">${fmt(paid)}</td><td class="num">${fmt(recv)}</td><td class="num">${fmt(paid-recv)}</td></tr>`;}).join('');
+  return `<section><div class="section-title">Scheme Summary</div>
+  ${ss.length?`<div class="table-wrap"><table><thead><tr><th>Scheme</th><th>Mode</th><th class="num">Members</th><th class="num">Done</th><th class="num">Collected</th><th class="num">Distributed</th><th class="num">Remaining</th><th>Status</th></tr></thead><tbody>${schRows}</tbody></table></div>`:'<div class="empty small">No schemes.</div>'}
+  <div class="section-title" style="margin-top:1.2rem">Member Statements</div>
+  ${ms.length?`<div class="table-wrap"><table><thead><tr><th>No.</th><th>Name</th><th class="num">Contributed</th><th class="num">Received</th><th class="num">Net (paid − recv)</th></tr></thead><tbody>${memStmt}</tbody></table></div>`:'<div class="empty small">No members.</div>'}
+  </section>`;
+}
+function viewSettings(){
+  const a=activeAssoc();
+  return `<section><div class="section-title">Association</div>
+  <div class="card" style="margin-bottom:1rem"><div class="row"><div><div class="section-title" style="margin:0">${esc(a?a.name:'—')}</div>
+    <div class="small muted">${a?esc(a.code||'')+' · '+esc(a.currency||'ETB'):''}<br>${a?esc(a.address||'—')+' · '+esc(a.phone||''):''}</div></div>
+    <button class="btn sm" data-action="assoc.add">+ New Association</button></div></div>
+  <div class="section-title">Data Management</div>
+  <div class="card" style="margin-bottom:1rem"><p class="small muted" style="margin-bottom:.8rem">All data is stored locally in this browser (localStorage). Export regularly to keep a backup or move data to another browser.</p>
+    <div class="row">
+      <button class="btn primary sm" data-action="data.export">⬇ Export JSON</button>
+      <button class="btn sm" data-action="data.import">⬆ Import JSON</button>
+      <button class="btn teal sm" data-action="settings.demo">Load Demo Data</button>
+      <button class="btn danger sm" data-action="data.reset">Reset All Data</button>
+    </div><input type="file" id="importFile" accept="application/json" class="hidden"></div>
+  <div class="section-title">Security</div>
+  <div class="card" style="margin-bottom:1rem"><div class="row"><span class="small">Admin: <b>${esc(DB.settings.adminName)}</b></span><button class="btn sm" data-action="settings.pin">Change PIN</button></div></div>
+  <div class="section-title">Documentation</div>
+  <div class="card"><div class="small muted" style="margin-bottom:.6rem">Reference design documents (in this repository):</div>
+    <div class="row">
+      <a class="btn sm" href="docs/EAMS_Technical_Design.pdf" target="_blank">Technical Design</a>
+      <a class="btn sm" href="docs/EAMS_UI_Wireframes.pdf" target="_blank">Wireframes</a>
+      <a class="btn sm" href="docs/EAMS_Test_Cases.xlsx" target="_blank">Test Cases</a>
+      <a class="btn sm" href="docs/EAMS_Deployment_Guide.pdf" target="_blank">Deployment Guide</a>
+      <a class="btn sm" href="database/eams_database_schema.sql" target="_blank">Schema SQL</a>
+      <a class="btn sm" href="api/eams_api_spec.yaml" target="_blank">API Spec</a>
+    </div></div>
+  </section>`;
+}
+
+/* ===== Demo data, export/import, pin, association ===== */
+function loadDemo(){
+  DB=initialDb();
+  const aid=uid();
+  DB.associations.push({id:aid,name:'Unity Iqub Association',code:'UNI',currency:'ETB',address:'Bole Road, Addis Ababa',phone:'+251 911 000000',email:'info@unityiqub.et',created_at:today()});
+  DB.settings={setup:true,adminPin:'1234',adminName:'Demo Admin',activeAssociationId:aid};
+  const names=['Abebe Kebede','Sara Tesfaye','Dawit Bekele','Helen Alemu','Yonas Girma','Marta Assefa','Solomon Haile','Liya Tadesse'];
+  const mids=names.map((nm,i)=>{const id=uid();DB.members.push({id,association_id:aid,member_no:'M'+String(i+1).padStart(4,'0'),full_name:nm,phone:'+251 91'+(1000000+i),email:'',id_no:'ID-'+(1000+i),status:'active',joined_at:today()});return id;});
+  const sid=uid();
+  DB.schemes.push({id:sid,association_id:aid,name:'Monthly Iqub — Q1',code:'IQ-Q1',type:'ekub',distribution_mode:'equal_rounds',round_value:2000,contribution_amount:1000,total_rounds:8,contribution_frequency:'monthly',start_date:today(),status:'active',drawn_rounds:[],created_at:today()});
+  mids.forEach(mid=>DB.enrollments.push({id:uid(),association_id:aid,scheme_id:sid,member_id:mid,share_type:'full',target_amount:8000,remaining_target:8000,total_received:0,rounds_received:0,status:'active',joined_at:today()}));
+  collectRound(sid,1); runDraw(sid,1);
+  collectRound(sid,2); runDraw(sid,2);
+  collectRound(sid,3);
+  audit('system.demoLoaded',aid); saveDb(); setSession({loggedIn:true,at:nowISO()});
+  toast('Demo loaded — PIN 1234. Rounds 1–2 drawn, round 3 ready to draw.');
+}
+function exportData(){const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='eams-backup-'+today()+'.json';a.click();URL.revokeObjectURL(url);toast('Data exported');}
+function importData(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.version)throw new Error('bad');DB=d;saveDb();toast('Data imported');render();}catch(e){toast('Invalid backup file','err');}};r.readAsText(file);}
+function doChangePin(v){if(String(v.old)!==String(DB.settings.adminPin)){toast('Current PIN is wrong','err');return;}if(String(v.new)!==String(v.confirm)){toast('New PINs do not match','err');return;}DB.settings.adminPin=String(v.new);saveDb();toast('PIN changed');}
+function addAssociation(v){const id=uid();DB.associations.push({id,name:v.name,code:v.code||'',currency:v.currency||'ETB',address:v.address||'',phone:v.phone||'',email:v.email||'',created_at:today()});DB.settings.activeAssociationId=id;audit('association.create',id);saveDb();}
+function openChangePinForm(){const body=`<div class="form-row"><div class="field"><label>Current PIN</label><input name="old" inputmode="numeric" required></div><div class="field"><label>New PIN (4-6 digits)</label><input name="new" inputmode="numeric" required pattern="[0-9]{4,6}"></div><div class="field"><label>Confirm New PIN</label><input name="confirm" inputmode="numeric" required></div></div>`;openModal(modalForm('Change PIN',body,'Update','changePin',''));}
+function openAssociationForm(){const body=`<div class="form-row"><div class="field"><label>Name *</label><input name="name" required></div><div class="field"><label>Code</label><input name="code"></div><div class="field"><label>Currency</label><select name="currency"><option>ETB</option><option>USD</option><option>KES</option><option>NGN</option></select></div><div class="field"><label>Phone</label><input name="phone"></div><div class="field"><label>Email</label><input name="email"></div><div class="field"><label>Address</label><input name="address"></div></div>`;openModal(modalForm('New Association',body,'Create','association',''));}
+
+/* ===== Action dispatcher ===== */
+function onAction(el){
+  const a=el.dataset.action, id=el.dataset.id, round=el.dataset.round;
+  switch(a){
+    case 'modal.close': closeModal(); return;
+    case 'app.logout': clearSession(); closeModal(); render(); return;
+    case 'member.add': openMemberForm(); return;
+    case 'member.edit': openMemberForm(id); return;
+    case 'member.del': if(confirm('Delete this member?')){deleteMember(id);renderView();} return;
+    case 'scheme.add': openSchemeForm(); return;
+    case 'scheme.edit': openSchemeForm(id); return;
+    case 'scheme.open': navigate('scheme/'+id); renderView(); return;
+    case 'scheme.close': if(confirm('Close this scheme? It can no longer accept draws.')){closeScheme(id);renderView();} return;
+    case 'enroll.add': openEnrollForm(id); return;
+    case 'enroll.del': if(confirm('Remove this enrollment?')){removeEnrollment(id);renderView();} return;
+    case 'contrib.add': openContributionForm(); return;
+    case 'round.collect': collectRound(id,round); renderView(); return;
+    case 'round.draw': runDraw(id,round); renderView(); return;
+    case 'settings.demo': loadDemo(); render(); return;
+    case 'data.export': exportData(); return;
+    case 'data.import': $('#importFile')&&$('#importFile').click(); return;
+    case 'data.reset': if(confirm('Erase ALL data? This cannot be undone.')){DB=initialDb();saveDb();clearSession();render();} return;
+    case 'settings.pin': openChangePinForm(); return;
+    case 'assoc.add': openAssociationForm(); return;
+  }
+}
+
+/* ===== Render + bootstrap ===== */
+function render(){
+  const root=$('#root');
+  if(!DB.settings.setup){root.innerHTML=viewSetup();return;}
+  const s=session();
+  if(!s||!s.loggedIn){root.innerHTML=viewLogin();setTimeout(()=>{const p=$('#loginPin');if(p)p.focus();},60);return;}
+  root.innerHTML=viewApp();
+  afterRender();
+}
+function boot(){
+  document.addEventListener('click',e=>{
+    if(e.target.classList.contains('modal-back')){closeModal();return;}
+    const el=e.target.closest('[data-action]'); if(el)onAction(el);
+  });
+  document.addEventListener('submit',e=>{
+    const f=e.target.closest('[data-form]'); if(!f)return; e.preventDefault();
+    const v=formVals(f), key=f.dataset.form, id=f.dataset.id; let full=false;
+    try{
+      if(key==='member'){if(id)updateMember(id,v);else addMember(v);toast('Member saved');}
+      else if(key==='scheme'){if(id)updateScheme(id,v);else addScheme(v);toast('Scheme saved');}
+      else if(key==='enroll'){enrollMember(v.scheme_id,v.member_id,v.target_amount,v.share_type);toast('Member enrolled');}
+      else if(key==='contribution'){addContribution(v);toast('Contribution recorded');}
+      else if(key==='collectRound'){const n=collectRound(v.scheme_id,v.round_no);toast(n?n+' contributions recorded':'Already collected');}
+      else if(key==='drawRound'){runDraw(v.scheme_id,v.round_no);}
+      else if(key==='setup'){doSetup(v);full=true;}
+      else if(key==='login'){doLogin(v);full=true;}
+      else if(key==='changePin'){doChangePin(v);}
+      else if(key==='association'){addAssociation(v);full=true;}
+    }catch(err){toast('Error: '+err.message,'err');}
+    closeModal();
+    if(full)render(); else renderView();
+  });
+  document.addEventListener('input',e=>{const s=e.target.closest('#memSearch');if(!s)return;const q=s.value.toLowerCase();$$('#memTable tbody tr').forEach(tr=>tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none');});
+  document.addEventListener('change',e=>{const f=e.target.closest('#importFile');if(!f)return;if(f.files&&f.files[0])importData(f.files[0]);});
+  window.addEventListener('hashchange',()=>{if(DB.settings.setup&&session()&&session().loggedIn)renderView();});
+  render();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+</script>
+</body>
+</html>
