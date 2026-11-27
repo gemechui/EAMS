@@ -1,0 +1,668 @@
+openapi: 3.1.0
+info:
+  title: EAMS — Ekub & Association Management System API
+  version: 1.0.0
+  description: |
+    REST API for the Ekub & Association Management System (EAMS), a multi-tenant
+    financial and membership management platform. All endpoints are
+    association-scoped (tenant-isolated via Row-Level Security on PostgreSQL).
+    The caller's association is resolved from the authenticated session; platform
+    endpoints are limited to the Platform Super Administrator.
+
+    Authentication: bearer JWT (`Authorization: Bearer <token>`).
+    Monetary values are transmitted as JSON strings (decimal, e.g. `"50000.00"`)
+    to preserve precision — clients MUST NOT use IEEE-754 floats.
+    All timestamps are ISO-8601 UTC.
+  contact:
+    name: EAMS Platform
+    url: https://eams.example.et
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.eams.example.et/v1
+    description: Production
+  - url: https://staging.api.eams.example.et/v1
+    description: Staging
+
+tags:
+  - name: Auth
+  - name: Platform
+  - name: Associations
+  - name: Branches
+  - name: Users & Roles
+  - name: Members
+  - name: Schemes
+  - name: Participation Plans
+  - name: Enrollments
+  - name: Contribution Schedules
+  - name: Contributions
+  - name: Receipts
+  - name: Draws
+  - name: Distributions
+  - name: Cash & Bank
+  - name: Expenses
+  - name: Accounting
+  - name: Approvals
+  - name: Reports
+  - name: Notifications
+  - name: Settings
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ---------------------------------------------------------------------------
+  # AUTH
+  # ---------------------------------------------------------------------------
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and obtain a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthToken' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '423': { description: Account locked }
+
+  /auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Verify MFA code and complete login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MfaVerifyRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthToken' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current session
+      responses: { '204': { description: Logged out } }
+
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Request a password reset link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string, format: email } } }
+      responses: { '202': { description: Reset email sent if account exists } }
+
+  # ---------------------------------------------------------------------------
+  # PLATFORM (super admin only)
+  # ---------------------------------------------------------------------------
+  /platform/dashboard:
+    get:
+      tags: [Platform]
+      summary: Platform-wide metrics
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PlatformDashboard' } } } } }
+
+  /platform/associations:
+    get:
+      tags: [Platform, Associations]
+      summary: List all associations on the platform
+      parameters: [ { $ref: '#/components/parameters/PageParam' }, { $ref: '#/components/parameters/PageSizeParam' } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AssociationList' } } } } }
+    post:
+      tags: [Platform, Associations]
+      summary: Register a new association (activates tenant)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssociationCreate' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Association' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /platform/associations/{associationId}/status:
+    patch:
+      tags: [Platform, Associations]
+      summary: Activate, suspend, or close an association
+      parameters: [ { $ref: '#/components/parameters/AssociationIdParam' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/AssociationStatus' } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Association' } } } } }
+
+  # ---------------------------------------------------------------------------
+  # ASSOCIATION-SCOPED (all below resolve the caller's association from session)
+  # ---------------------------------------------------------------------------
+  /associations/me:
+    get:
+      tags: [Associations]
+      summary: Get the caller's association profile and configuration
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Association' } } } } }
+
+  /associations/me/dashboard:
+    get:
+      tags: [Associations]
+      summary: Association dashboard KPIs
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AssociationDashboard' } } } } }
+
+  /associations/me:
+    patch:
+      tags: [Associations]
+      summary: Update association settings (currency, receipt prefix, financial year, approval matrix)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssociationUpdate' } } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Association' } } } } }
+
+  /branches:
+    get:
+      tags: [Branches]
+      summary: List branches
+      parameters: [ { $ref: '#/components/parameters/PageParam' }, { $ref: '#/components/parameters/PageSizeParam' } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BranchList' } } } } }
+    post:
+      tags: [Branches]
+      summary: Create a branch
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BranchCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Branch' } } } } }
+
+  /branches/{branchId}:
+    parameters: [ { $ref: '#/components/parameters/BranchIdParam' } ]
+    get:    { tags: [Branches], summary: Get a branch, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Branch' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:  { tags: [Branches], summary: Update a branch, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BranchCreate' } } } }, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Branch' } } } } } }
+
+  # ---------------------------------------------------------------------------
+  # USERS & ROLES
+  # ---------------------------------------------------------------------------
+  /users:
+    get:
+      tags: [Users & Roles]
+      summary: List users
+      parameters:
+        - { name: role_id, in: query, schema: { type: string, format: uuid } }
+        - { name: branch_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
+        - { $ref: '#/components/parameters/PageParam' }
+        - { $ref: '#/components/parameters/PageSizeParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/UserList' } } } } }
+    post:
+      tags: [Users & Roles]
+      summary: Create a staff user and assign roles
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UserCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } }
+
+  /users/{userId}:
+    parameters: [ { $ref: '#/components/parameters/UserIdParam' } ]
+    get:   { tags: [Users & Roles], summary: Get a user, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } } }
+    patch: { tags: [Users & Roles], summary: 'Update a user (roles, branch, status)', requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UserUpdate' } } } }, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } } }
+    delete: { tags: [Users & Roles], summary: Suspend a user (soft), responses: { '204': { description: Suspended } } }
+
+  /roles:
+    get:  { tags: [Users & Roles], summary: List roles, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Role' } } } } } } }
+    post: { tags: [Users & Roles], summary: Create a role and assign permissions, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RoleCreate' } } } }, responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } } } } }
+
+  /roles/{roleId}/permissions:
+    parameters: [ { name: roleId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    put: { tags: [Users & Roles], summary: Replace a role's permission set, requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { permission_codes: { type: array, items: { type: string } } } } } } }, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } } } } }
+
+  /approval-limits:
+    get:  { tags: [Users & Roles], summary: List approval limits, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ApprovalLimit' } } } } } } }
+    post: { tags: [Users & Roles], summary: Set an approval limit, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalLimit' } } } }, responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalLimit' } } } } } }
+
+  # ---------------------------------------------------------------------------
+  # MEMBERS
+  # ---------------------------------------------------------------------------
+  /members:
+    get:
+      tags: [Members]
+      summary: Member register (search/filter/export)
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: search name/number/phone/id }
+        - { name: branch_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/MembershipStatus' } }
+        - { name: scheme_id, in: query, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/PageParam' }
+        - { $ref: '#/components/parameters/PageSizeParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MemberList' } } } } }
+    post:
+      tags: [Members]
+      summary: Register a member (creates a pending membership)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MemberCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } } }
+
+  /members/import:
+    post:
+      tags: [Members]
+      summary: Bulk import members from an Excel file
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '202': { description: Import queued, content: { application/json: { schema: { $ref: '#/components/schemas/JobRef' } } } } }
+
+  /members/{memberId}:
+    parameters: [ { $ref: '#/components/parameters/MemberIdParam' } ]
+    get: { tags: [Members], summary: Member profile, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } } } }
+    patch: { tags: [Members], summary: Update a member, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MemberUpdate' } } } }, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } } } }
+
+  /members/{memberId}/approve:
+    parameters: [ { $ref: '#/components/parameters/MemberIdParam' } ]
+    post: { tags: [Members], summary: Approve and activate a pending member (generates member number), responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Member' } } } } } }
+
+  /members/{memberId}/suspend:
+    parameters: [ { $ref: '#/components/parameters/MemberIdParam' } ]
+    post: { tags: [Members], summary: Suspend a member, requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } } }, responses: { '200': { description: OK } } }
+
+  /members/{memberId}/statement:
+    parameters: [ { $ref: '#/components/parameters/MemberIdParam' } ]
+    get:
+      tags: [Members, Reports]
+      summary: Member financial statement
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to,   in: query, schema: { type: string, format: date } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MemberStatement' } } } } }
+
+  # ---------------------------------------------------------------------------
+  # SCHEMES
+  # ---------------------------------------------------------------------------
+  /schemes:
+    get:
+      tags: [Schemes]
+      summary: Scheme register
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/SchemeStatus' } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/SchemeType' } }
+        - { $ref: '#/components/parameters/PageParam' }
+        - { $ref: '#/components/parameters/PageSizeParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SchemeList' } } } } }
+    post:
+      tags: [Schemes]
+      summary: Create a scheme (draft) — wizard writes here
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SchemeCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Scheme' } } } } }
+
+  /schemes/{schemeId}:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:   { tags: [Schemes], summary: Scheme detail, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Scheme' } } } } } }
+    patch: { tags: [Schemes], summary: Update a draft scheme, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SchemeCreate' } } } }, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Scheme' } } } } } }
+
+  /schemes/{schemeId}/submit:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    post: { tags: [Schemes, Approvals], summary: Submit scheme for approval, responses: { '202': { description: Submitted } } }
+
+  /schemes/{schemeId}/approve:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    post: { tags: [Schemes, Approvals], summary: Approve scheme and open enrollment, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Scheme' } } } } } }
+
+  /schemes/{schemeId}/participation-plans:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:  { tags: [Participation Plans], summary: List plans, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ParticipationPlan' } } } } } } }
+    post: { tags: [Participation Plans], summary: Create a participation plan, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ParticipationPlanCreate' } } } }, responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ParticipationPlan' } } } } } }
+
+  /schemes/{schemeId}/enrollments:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:  { tags: [Enrollments], summary: List enrollments, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Enrollment' } } } } } } }
+    post: { tags: [Enrollments], summary: Enroll a member in a plan (generates schedules), requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentCreate' } } } }, responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Enrollment' } } } } } }
+
+  /schemes/{schemeId}/entitlement-balances:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:
+      tags: [Schemes]
+      summary: Per-member remaining target entitlement (drives draw eligibility)
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EntitlementBalance' } } } } } }
+
+  # ---------------------------------------------------------------------------
+  # CONTRIBUTION SCHEDULES & PAYMENTS
+  # ---------------------------------------------------------------------------
+  /contribution-schedules:
+    get:
+      tags: [Contribution Schedules]
+      summary: Contribution schedule register
+      parameters:
+        - { name: scheme_id, in: query, schema: { type: string, format: uuid } }
+        - { name: member_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/PaymentStatus' } }
+        - { name: due_before, in: query, schema: { type: string, format: date } }
+        - { name: due_after, in: query, schema: { type: string, format: date } }
+        - { $ref: '#/components/parameters/PageParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ScheduleList' } } } } }
+
+  /schemes/{schemeId}/schedules/regenerate:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    post: { tags: [Contribution Schedules, Approvals], summary: Regenerate future schedules (requires approval), responses: { '202': { description: Regeneration queued } } }
+
+  /contributions:
+    get:
+      tags: [Contributions]
+      summary: List contributions
+      parameters:
+        - { name: scheme_id, in: query, schema: { type: string, format: uuid } }
+        - { name: member_id, in: query, schema: { type: string, format: uuid } }
+        - { name: cashier_id, in: query, schema: { type: string, format: uuid } }
+        - { name: method, in: query, schema: { $ref: '#/components/schemas/PaymentMethod' } }
+        - { name: verification, in: query, schema: { $ref: '#/components/schemas/VerificationStatus' } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { $ref: '#/components/parameters/PageParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ContributionList' } } } } }
+    post:
+      tags: [Contributions]
+      summary: Record a payment (cashier); posts pending contribution + receipt
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ContributionCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } } }
+
+  /contributions/{contributionId}/verify:
+    parameters: [ { name: contributionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Contributions]
+      summary: Verify or reject a pending contribution (maker-checker)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VerifyRequest' } } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Contribution' } } } } }
+
+  /contributions/{contributionId}/reverse:
+    parameters: [ { name: contributionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Contributions, Approvals]
+      summary: Reverse an erroneous contribution (approval required; posts reversing journal entry)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReverseRequest' } } } }
+      responses: { '202': { description: Reversal queued for approval } }
+
+  /receipts/{receiptId}:
+    parameters: [ { name: receiptId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { tags: [Receipts], summary: Get a receipt, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Receipt' } } } } } }
+
+  /receipts/{receiptId}/pdf:
+    parameters: [ { name: receiptId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { tags: [Receipts], summary: Download receipt PDF, responses: { '200': { description: PDF, content: { application/pdf: { schema: { type: string, format: binary } } } } } }
+
+  # ---------------------------------------------------------------------------
+  # DRAWS & DISTRIBUTIONS
+  # ---------------------------------------------------------------------------
+  /schemes/{schemeId}/draw-sessions:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:  { tags: [Draws], summary: List draw sessions, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/DrawSession' } } } } } } }
+    post:
+      tags: [Draws]
+      summary: Prepare a draw session (computes eligible snapshot from entitlement balances)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DrawSessionCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/DrawSession' } } } } }
+
+  /draw-sessions/{drawSessionId}/execute:
+    parameters: [ { name: drawSessionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Draws]
+      summary: Execute the auditable random selection (records seed commitment + result)
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DrawResult' } } } } }
+
+  /draw-sessions/{drawSessionId}/approve:
+    parameters: [ { name: drawSessionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post: { tags: [Draws, Approvals], summary: Approve draw result, responses: { '200': { description: OK } } }
+
+  /schemes/{schemeId}/rotation:
+    parameters: [ { $ref: '#/components/parameters/SchemeIdParam' } ]
+    get:  { tags: [Draws], summary: Get the predetermined rotation order, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RotationPosition' } } } } } } }
+    put:  { tags: [Draws, Approvals], summary: Set/replace the rotation order (approval required), requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RotationPositionInput' } } } } }, responses: { '200': { description: OK } } }
+
+  /distributions:
+    get:
+      tags: [Distributions]
+      summary: List distributions
+      parameters:
+        - { name: scheme_id, in: query, schema: { type: string, format: uuid } }
+        - { name: beneficiary_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/DistributionStatus' } }
+        - { $ref: '#/components/parameters/PageParam' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionList' } } } } }
+    post:
+      tags: [Distributions]
+      summary: Prepare a distribution from an approved draw result
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionCreate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Distribution' } } } } }
+
+  /distributions/{distributionId}/approve:
+    parameters: [ { name: distributionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post: { tags: [Distributions, Approvals], summary: Approve the distribution payment, responses: { '200': { description: OK } } }
+
+  /distributions/{distributionId}/pay:
+    parameters: [ { name: distributionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Distributions]
+      summary: Record payment to beneficiary (verifies available funds; posts journal entry)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionPayRequest' } } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Distribution' } } } } }
+
+  /distributions/{distributionId}/confirm:
+    parameters: [ { name: distributionId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post: { tags: [Distributions], summary: Record beneficiary confirmation, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DistributionConfirm' } } } }, responses: { '200': { description: OK } } }
+
+  # ---------------------------------------------------------------------------
+  # CASH / BANK / EXPENSES / ACCOUNTING
+  # ---------------------------------------------------------------------------
+  /cash-accounts:
+    get:  { tags: [Cash & Bank], summary: List cash accounts, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CashAccount' } } } } } } }
+    post: { tags: [Cash & Bank], summary: Create a cash account, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CashAccountCreate' } } } }, responses: { '201': { description: Created } } }
+
+  /bank-accounts:
+    get:  { tags: [Cash & Bank], summary: List bank accounts, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BankAccount' } } } } } } }
+    post: { tags: [Cash & Bank], summary: Create a bank account, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BankAccountCreate' } } } }, responses: { '201': { description: Created } } }
+
+  /cash-accounts/{accountId}/transactions:
+    parameters: [ { name: accountId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post: { tags: [Cash & Bank], summary: Deposit / withdrawal / transfer, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CashTransaction' } } } }, responses: { '201': { description: Created } } }
+
+  /expenses:
+    get:  { tags: [Expenses], summary: List expenses, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Expense' } } } } } } }
+    post: { tags: [Expenses], summary: Submit an expense, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ExpenseCreate' } } } }, responses: { '201': { description: Created } } }
+
+  /expenses/{expenseId}/approve:
+    parameters: [ { name: expenseId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post: { tags: [Expenses, Approvals], summary: Approve an expense, responses: { '200': { description: OK } } }
+
+  /journal-entries:
+    get:
+      tags: [Accounting]
+      summary: General ledger (journal entries)
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: source_type, in: query, schema: { type: string } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/JournalEntry' } } } } } }
+
+  /reports/trial-balance:
+    get:
+      tags: [Reports, Accounting]
+      summary: Trial balance
+      parameters: [ { name: as_of, in: query, schema: { type: string, format: date } } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TrialBalance' } } } } }
+
+  /reports/financial-statements:
+    get:
+      tags: [Reports, Accounting]
+      summary: Income & expenditure, balance sheet, cash flow
+      parameters:
+        - { name: statement, in: query, required: true, schema: { type: string, enum: [income_expenditure, balance_sheet, cash_flow] } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FinancialStatement' } } } } }
+
+  /reports/collections:
+    get:
+      tags: [Reports]
+      summary: Collection report (daily/weekly/monthly/annual by scheme/cashier)
+      parameters:
+        - { name: period, in: query, schema: { type: string, enum: [daily, weekly, biweekly, monthly, annual] } }
+        - { name: scheme_id, in: query, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CollectionReport' } } } } }
+
+  /reports/export:
+    get:
+      tags: [Reports]
+      summary: Export a report as PDF or XLSX
+      parameters:
+        - { name: report, in: query, required: true, schema: { type: string } }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [pdf, xlsx] } }
+      responses:
+        '200': { description: File, content: { application/pdf: { schema: { type: string, format: binary } }, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { schema: { type: string, format: binary } } } }
+
+  # ---------------------------------------------------------------------------
+  # APPROVALS / NOTIFICATIONS / SETTINGS
+  # ---------------------------------------------------------------------------
+  /approvals:
+    get:
+      tags: [Approvals]
+      summary: Pending approvals assigned to the caller
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ApprovalStatus' } }
+        - { name: type, in: query, schema: { type: string } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ApprovalRequest' } } } } } }
+
+  /approvals/{approvalId}/decide:
+    parameters: [ { name: approvalId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Approvals]
+      summary: Approve / reject / return / escalate
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalDecision' } } } }
+      responses: { '200': { description: OK } }
+
+  /notifications:
+    get: { tags: [Notifications], summary: List in-app notifications, responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Notification' } } } } } } }
+
+  /settings:
+    get:  { tags: [Settings], summary: Get association settings, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/SystemSettings' } } } } } }
+    patch: { tags: [Settings], summary: Update association settings, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SystemSettings' } } } }, responses: { '200': { description: OK } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    PageParam:     { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSizeParam: { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 25 } }
+    AssociationIdParam: { name: associationId, in: path, required: true, schema: { type: string, format: uuid } }
+    BranchIdParam: { name: branchId, in: path, required: true, schema: { type: string, format: uuid } }
+    UserIdParam:   { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    MemberIdParam: { name: memberId, in: path, required: true, schema: { type: string, format: uuid } }
+    SchemeIdParam: { name: schemeId, in: path, required: true, schema: { type: string, format: uuid } }
+
+  responses:
+    Unauthorized:    { description: Authentication required or invalid, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:       { description: Insufficient permission, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound:        { description: Resource not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ValidationError: { description: Validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict:        { description: Duplicate or conflicting state, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  schemas:
+    Error: { type: object, required: [code, message], properties: { code: { type: string }, message: { type: string }, details: { type: object, additionalProperties: true } } }
+    JobRef: { type: object, properties: { job_id: { type: string, format: uuid }, status_url: { type: string } } }
+
+    Money: { type: string, description: Decimal monetary value as string, example: "50000.00" }
+
+    AssociationStatus: { type: string, enum: [pending, active, suspended, closed] }
+    UserStatus: { type: string, enum: [active, suspended, locked, closed] }
+    MembershipStatus: { type: string, enum: [pending, active, suspended, withdrawn, closed] }
+    SchemeType: { type: string, enum: [traditional_rotating, target_based] }
+    SchemeStatus: { type: string, enum: [draft, pending_approval, approved, open_enrollment, active, suspended, completed, closed] }
+    DistributionMode: { type: string, enum: [traditional_pool, equal_rounds, target_entitlement], description: Resolved distribution model (see Technical Design) }
+    PaymentStatus: { type: string, enum: [upcoming, due, partially_paid, paid, overdue, waived, cancelled] }
+    PaymentMethod: { type: string, enum: [cash, bank_transfer, digital, other] }
+    VerificationStatus: { type: string, enum: [pending, verified, rejected] }
+    DistributionStatus: { type: string, enum: [prepared, pending_approval, approved, paid, partially_paid, cancelled, reversed] }
+    ApprovalStatus: { type: string, enum: [pending, approved, rejected, returned, escalated] }
+
+    LoginRequest: { type: object, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string, format: password }, remember_me: { type: boolean } } }
+    MfaVerifyRequest: { type: object, required: [mfa_ticket, code], properties: { mfa_ticket: { type: string }, code: { type: string } } }
+    AuthToken: { type: object, properties: { access_token: { type: string }, token_type: { type: string, example: Bearer }, expires_in: { type: integer }, refresh_token: { type: string }, association_id: { type: string, format: uuid }, roles: { type: array, items: { type: string } } } }
+
+    PlatformDashboard: { type: object, properties: { total_associations: { type: integer }, active_associations: { type: integer }, suspended_associations: { type: integer }, total_members: { type: integer }, active_schemes: { type: integer }, subscription_summary: { type: object, additionalProperties: true } } }
+
+    AssociationBase: { type: object, properties: { association_name: { type: string }, registration_number: { type: string }, registration_date: { type: string, format: date }, address: { type: string }, phone: { type: string }, email: { type: string, format: email }, currency: { type: string, default: ETB }, date_format: { type: string }, time_zone: { type: string }, financial_year_start: { type: string, format: date }, receipt_prefix: { type: string } } }
+    AssociationCreate: { allOf: [ { $ref: '#/components/schemas/AssociationBase' }, { type: object, properties: { association_code: { type: string }, general_manager: { $ref: '#/components/schemas/UserCreate' } } } ] }
+    AssociationUpdate: { $ref: '#/components/schemas/AssociationBase' }
+    Association: { allOf: [ { $ref: '#/components/schemas/AssociationBase' }, { type: object, properties: { id: { type: string, format: uuid }, association_code: { type: string }, status: { $ref: '#/components/schemas/AssociationStatus' }, created_at: { type: string, format: date-time } } } ] }
+    AssociationList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Association' } }, total: { type: integer }, page: { type: integer }, page_size: { type: integer } } }
+
+    AssociationDashboard: { type: object, properties: { total_members: { type: integer }, active_members: { type: integer }, active_schemes: { type: integer }, expected_contributions: { $ref: '#/components/schemas/Money' }, actual_collections: { $ref: '#/components/schemas/Money' }, outstanding_contributions: { $ref: '#/components/schemas/Money' }, total_distributions: { $ref: '#/components/schemas/Money' }, pending_approvals: { type: integer }, upcoming_draws: { type: array, items: { type: object } } } }
+
+    BranchBase: { type: object, required: [branch_code, branch_name], properties: { branch_code: { type: string }, branch_name: { type: string }, address: { type: string }, manager_id: { type: string, format: uuid } } }
+    BranchCreate: { $ref: '#/components/schemas/BranchBase' }
+    Branch: { allOf: [ { $ref: '#/components/schemas/BranchBase' }, { type: object, properties: { id: { type: string, format: uuid }, association_id: { type: string, format: uuid }, status: { type: string } } } ] }
+    BranchList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Branch' } }, total: { type: integer } } }
+
+    Role: { type: object, properties: { id: { type: string, format: uuid }, role_name: { type: string }, description: { type: string }, permissions: { type: array, items: { type: string } } } }
+    RoleCreate: { type: object, required: [role_name], properties: { role_name: { type: string }, description: { type: string }, permission_codes: { type: array, items: { type: string } } } }
+    ApprovalLimit: { type: object, properties: { role_id: { type: string, format: uuid }, transaction_type: { type: string }, max_amount: { $ref: '#/components/schemas/Money' }, currency: { type: string } } }
+
+    UserBase: { type: object, required: [full_name, email], properties: { full_name: { type: string }, email: { type: string, format: email }, phone: { type: string }, branch_id: { type: string, format: uuid } } }
+    UserCreate: { allOf: [ { $ref: '#/components/schemas/UserBase' }, { type: object, properties: { role_ids: { type: array, items: { type: string, format: uuid } }, send_invite: { type: boolean } } } ] }
+    UserUpdate: { type: object, properties: { role_ids: { type: array, items: { type: string, format: uuid } }, branch_id: { type: string, format: uuid }, status: { $ref: '#/components/schemas/UserStatus' } } }
+    User: { allOf: [ { $ref: '#/components/schemas/UserBase' }, { type: object, properties: { id: { type: string, format: uuid }, association_id: { type: string, format: uuid }, status: { $ref: '#/components/schemas/UserStatus' }, last_login_at: { type: string, format: date-time }, roles: { type: array, items: { $ref: '#/components/schemas/Role' } } } } ] }
+    UserList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/User' } }, total: { type: integer } } }
+
+    MemberBase: { type: object, required: [full_name, phone, address], properties: { full_name: { type: string }, gender: { type: string }, date_of_birth: { type: string, format: date }, identification_type: { type: string }, identification_number: { type: string }, phone: { type: string }, email: { type: string, format: email }, address: { type: string }, branch_id: { type: string, format: uuid }, emergency_contact: { type: string }, next_of_kin: { type: string } } }
+    MemberCreate: { allOf: [ { $ref: '#/components/schemas/MemberBase' } ] }
+    MemberUpdate: { $ref: '#/components/schemas/MemberBase' }
+    Member: { allOf: [ { $ref: '#/components/schemas/MemberBase' }, { type: object, properties: { id: { type: string, format: uuid }, association_id: { type: string, format: uuid }, member_number: { type: string }, membership_status: { $ref: '#/components/schemas/MembershipStatus' }, registration_date: { type: string, format: date } } } ] }
+    MemberList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Member' } }, total: { type: integer } } }
+    MemberStatement: { type: object, properties: { member_id: { type: string, format: uuid }, opening_balance: { $ref: '#/components/schemas/Money' }, closing_balance: { $ref: '#/components/schemas/Money' }, lines: { type: array, items: { type: object, properties: { date: { type: string, format: date }, description: { type: string }, debit: { $ref: '#/components/schemas/Money' }, credit: { $ref: '#/components/schemas/Money' } } } } } }
+
+    SchemeBase: { type: object, required: [scheme_code, scheme_name, scheme_type, distribution_method, contribution_frequency, distribution_frequency, contribution_start_date], properties: { scheme_code: { type: string }, scheme_name: { type: string }, scheme_type: { $ref: '#/components/schemas/SchemeType' }, distribution_method: { type: string, enum: [random_draw, predetermined_rotation] }, distribution_mode: { $ref: '#/components/schemas/DistributionMode' }, round_value: { $ref: '#/components/schemas/Money' }, target_amount: { $ref: '#/components/schemas/Money' }, contribution_frequency: { type: string, enum: [daily, weekly, biweekly, monthly, annual, custom] }, distribution_frequency: { type: string, enum: [daily, weekly, biweekly, monthly, annual, custom] }, contribution_start_date: { type: string, format: date }, contribution_end_date: { type: string, format: date }, maximum_members: { type: integer }, minimum_members: { type: integer }, admin_fee_percent: { type: number, format: float }, penalty_late_percent: { type: number, format: float }, grace_period_days: { type: integer }, allow_repeat_winner: { type: boolean }, branch_id: { type: string, format: uuid } } }
+    SchemeCreate: { $ref: '#/components/schemas/SchemeBase' }
+    Scheme: { allOf: [ { $ref: '#/components/schemas/SchemeBase' }, { type: object, properties: { id: { type: string, format: uuid }, association_id: { type: string, format: uuid }, scheme_status: { $ref: '#/components/schemas/SchemeStatus' }, total_collected: { $ref: '#/components/schemas/Money' }, total_distributed: { $ref: '#/components/schemas/Money' }, created_by: { type: string, format: uuid }, approved_by: { type: string, format: uuid } } } ] }
+    SchemeList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Scheme' } }, total: { type: integer } } }
+
+    ParticipationPlanCreate: { type: object, required: [plan_name, participation_units, target_allocation, contribution_amount], properties: { plan_name: { type: string }, participation_units: { type: number, format: float }, target_allocation: { $ref: '#/components/schemas/Money' }, contribution_formula_type: { type: string, enum: [fixed_amount, unit_multiplier, custom] }, contribution_amount: { $ref: '#/components/schemas/Money' } } }
+    ParticipationPlan: { allOf: [ { $ref: '#/components/schemas/ParticipationPlanCreate' }, { type: object, properties: { id: { type: string, format: uuid }, scheme_id: { type: string, format: uuid }, status: { type: string } } } ] }
+
+    EnrollmentCreate: { type: object, required: [member_id, participation_plan_id], properties: { member_id: { type: string, format: uuid }, participation_plan_id: { type: string, format: uuid } } }
+    Enrollment: { type: object, properties: { id: { type: string, format: uuid }, scheme_id: { type: string, format: uuid }, member_id: { type: string, format: uuid }, participation_plan_id: { type: string, format: uuid }, enrollment_date: { type: string, format: date }, agreed_contribution: { $ref: '#/components/schemas/Money' }, agreed_target: { $ref: '#/components/schemas/Money' }, contributed_amount: { $ref: '#/components/schemas/Money' }, distributed_amount: { $ref: '#/components/schemas/Money' }, remaining_target: { $ref: '#/components/schemas/Money' }, target_satisfied: { type: boolean }, enrollment_status: { type: string } } }
+    EntitlementBalance: { type: object, properties: { enrollment_id: { type: string, format: uuid }, member_id: { type: string, format: uuid }, target_allocation: { $ref: '#/components/schemas/Money' }, distributed_to_date: { $ref: '#/components/schemas/Money' }, remaining_target: { $ref: '#/components/schemas/Money' }, target_satisfied: { type: boolean } } }
+
+    ScheduleList: { type: object, properties: { items: { type: array, items: { type: object, properties: { id: { type: string, format: uuid }, member_id: { type: string, format: uuid }, scheme_id: { type: string, format: uuid }, due_date: { type: string, format: date }, expected_amount: { $ref: '#/components/schemas/Money' }, paid_amount: { $ref: '#/components/schemas/Money' }, outstanding_amount: { $ref: '#/components/schemas/Money' }, status: { $ref: '#/components/schemas/PaymentStatus' } } } }, total: { type: integer } } }
+
+    ContributionCreate: { type: object, required: [scheme_id, member_id, amount, payment_date, payment_method], properties: { scheme_id: { type: string, format: uuid }, member_id: { type: string, format: uuid }, amount: { $ref: '#/components/schemas/Money' }, payment_date: { type: string, format: date }, payment_method: { $ref: '#/components/schemas/PaymentMethod' }, payment_reference: { type: string }, bank_account_id: { type: string, format: uuid }, cash_account_id: { type: string, format: uuid } } }
+    Contribution: { type: object, properties: { id: { type: string, format: uuid }, transaction_number: { type: string }, scheme_id: { type: string, format: uuid }, member_id: { type: string, format: uuid }, amount: { $ref: '#/components/schemas/Money' }, currency: { type: string }, payment_method: { $ref: '#/components/schemas/PaymentMethod' }, payment_reference: { type: string }, cashier_id: { type: string, format: uuid }, verification_status: { $ref: '#/components/schemas/VerificationStatus' }, receipt_id: { type: string, format: uuid }, is_reversed: { type: boolean }, created_at: { type: string, format: date-time } } }
+    ContributionList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Contribution' } }, total: { type: integer } } }
+    VerifyRequest: { type: object, required: [action], properties: { action: { type: string, enum: [verify, reject, request_correction] }, comments: { type: string } } }
+    ReverseRequest: { type: object, required: [reason], properties: { reason: { type: string } } }
+
+    Receipt: { type: object, properties: { id: { type: string, format: uuid }, receipt_number: { type: string }, contribution_id: { type: string, format: uuid }, issue_date: { type: string, format: date-time }, issued_by: { type: string, format: uuid }, document_url: { type: string } } }
+
+    DrawSessionCreate: { type: object, required: [round_number, draw_method], properties: { round_number: { type: integer }, draw_method: { type: string, enum: [random_draw, predetermined_rotation] }, witnesses: { type: array, items: { type: string, format: uuid } } } }
+    DrawSession: { type: object, properties: { id: { type: string, format: uuid }, scheme_id: { type: string, format: uuid }, round_number: { type: integer }, draw_method: { type: string }, draw_date: { type: string, format: date-time }, status: { type: string }, eligible_count: { type: integer }, algorithm_version: { type: string }, seed_commitment: { type: string }, executed_by: { type: string, format: uuid } } }
+    DrawResult: { type: object, properties: { draw_session_id: { type: string, format: uuid }, winner_member_id: { type: string, format: uuid }, result_status: { type: string }, selected_at: { type: string, format: date-time }, approved_at: { type: string, format: date-time } } }
+
+    RotationPositionInput: { type: object, required: [member_id, sequence_number], properties: { member_id: { type: string, format: uuid }, sequence_number: { type: integer }, expected_distribution_date: { type: string, format: date } } }
+    RotationPosition: { allOf: [ { $ref: '#/components/schemas/RotationPositionInput' }, { type: object, properties: { id: { type: string, format: uuid }, status: { type: string } } } ] }
+
+    DistributionCreate: { type: object, required: [draw_session_id, beneficiary_id, gross_amount], properties: { draw_session_id: { type: string, format: uuid }, beneficiary_id: { type: string, format: uuid }, round_number: { type: integer }, installment_number: { type: integer }, gross_amount: { $ref: '#/components/schemas/Money' }, deductions: { type: array, items: { type: object, properties: { deduction_type: { type: string }, amount: { $ref: '#/components/schemas/Money' }, reason: { type: string } } } } } }
+    Distribution: { type: object, properties: { id: { type: string, format: uuid }, scheme_id: { type: string, format: uuid }, draw_session_id: { type: string, format: uuid }, beneficiary_id: { type: string, format: uuid }, round_number: { type: integer }, installment_number: { type: integer }, gross_amount: { $ref: '#/components/schemas/Money' }, deductions: { $ref: '#/components/schemas/Money' }, net_amount: { $ref: '#/components/schemas/Money' }, payment_status: { $ref: '#/components/schemas/DistributionStatus' }, payment_method: { $ref: '#/components/schemas/PaymentMethod' }, payment_reference: { type: string }, payment_date: { type: string, format: date }, approved_by: { type: string, format: uuid }, paid_by: { type: string, format: uuid }, is_reversed: { type: boolean } } }
+    DistributionList: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Distribution' } }, total: { type: integer } } }
+    DistributionPayRequest: { type: object, required: [payment_method], properties: { payment_method: { $ref: '#/components/schemas/PaymentMethod' }, payment_reference: { type: string }, cash_account_id: { type: string, format: uuid }, bank_account_id: { type: string, format: uuid } } }
+    DistributionConfirm: { type: object, required: [confirmation_method], properties: { confirmation_method: { type: string, enum: [signature, otp, biometric, witness] }, evidence_url: { type: string } } }
+
+    CashAccountCreate: { type: object, required: [account_name], properties: { account_name: { type: string }, branch_id: { type: string, format: uuid }, currency: { type: string }, opening_balance: { $ref: '#/components/schemas/Money' } } }
+    CashAccount: { allOf: [ { $ref: '#/components/schemas/CashAccountCreate' }, { type: object, properties: { id: { type: string, format: uuid }, current_balance: { $ref: '#/components/schemas/Money' }, status: { type: string } } } ] }
+    BankAccountCreate: { type: object, required: [bank_name, account_name, account_number], properties: { bank_name: { type: string }, account_name: { type: string }, account_number: { type: string }, branch_id: { type: string, format: uuid }, currency: { type: string }, opening_balance: { $ref: '#/components/schemas/Money' } } }
+    BankAccount: { allOf: [ { $ref: '#/components/schemas/BankAccountCreate' }, { type: object, properties: { id: { type: string, format: uuid }, current_balance: { $ref: '#/components/schemas/Money' }, status: { type: string } } } ] }
+    CashTransaction: { type: object, required: [transaction_type, amount], properties: { transaction_type: { type: string, enum: [deposit, withdrawal, transfer] }, amount: { $ref: '#/components/schemas/Money' }, to_account_id: { type: string, format: uuid }, reference: { type: string } } }
+
+    ExpenseCreate: { type: object, required: [expense_date, expense_category, amount], properties: { expense_date: { type: string, format: date }, expense_category: { type: string }, amount: { $ref: '#/components/schemas/Money' }, description: { type: string }, payee: { type: string }, cash_account_id: { type: string, format: uuid }, bank_account_id: { type: string, format: uuid } } }
+    Expense: { allOf: [ { $ref: '#/components/schemas/ExpenseCreate' }, { type: object, properties: { id: { type: string, format: uuid }, expense_number: { type: string }, approval_status: { type: string }, approved_by: { type: string, format: uuid } } } ] }
+
+    JournalLine: { type: object, properties: { account_code: { type: string }, account_name: { type: string }, debit_amount: { $ref: '#/components/schemas/Money' }, credit_amount: { $ref: '#/components/schemas/Money' } } }
+    JournalEntry: { type: object, properties: { id: { type: string, format: uuid }, journal_number: { type: string }, transaction_date: { type: string, format: date }, source_type: { type: string }, description: { type: string }, status: { type: string }, posted_by: { type: string, format: uuid }, lines: { type: array, items: { $ref: '#/components/schemas/JournalLine' } } } }
+
+    TrialBalanceRow: { type: object, properties: { account_code: { type: string }, account_name: { type: string }, account_type: { type: string }, debit: { $ref: '#/components/schemas/Money' }, credit: { $ref: '#/components/schemas/Money' } } }
+    TrialBalance: { type: object, properties: { as_of: { type: string, format: date }, rows: { type: array, items: { $ref: '#/components/schemas/TrialBalanceRow' } }, total_debit: { $ref: '#/components/schemas/Money' }, total_credit: { $ref: '#/components/schemas/Money' } } }
+    FinancialStatement: { type: object, properties: { statement_type: { type: string }, period: { type: object }, sections: { type: array, items: { type: object, properties: { name: { type: string }, rows: { type: array, items: { $ref: '#/components/schemas/TrialBalanceRow' } }, subtotal: { $ref: '#/components/schemas/Money' } } } }, totals: { type: object, additionalProperties: { $ref: '#/components/schemas/Money' } } } }
+    CollectionReport: { type: object, properties: { period: { type: string }, expected: { $ref: '#/components/schemas/Money' }, collected: { $ref: '#/components/schemas/Money' }, outstanding: { $ref: '#/components/schemas/Money' }, by_scheme: { type: array, items: { type: object } }, by_cashier: { type: array, items: { type: object } } } }
+
+    ApprovalRequest: { type: object, properties: { id: { type: string, format: uuid }, transaction_type: { type: string }, transaction_id: { type: string, format: uuid }, submitted_by: { type: string, format: uuid }, assigned_approver: { type: string, format: uuid }, approval_status: { $ref: '#/components/schemas/ApprovalStatus' }, created_at: { type: string, format: date-time } } }
+    ApprovalDecision: { type: object, required: [action], properties: { action: { type: string, enum: [approve, reject, return, escalate] }, comments: { type: string } } }
+
+    Notification: { type: object, properties: { id: { type: string, format: uuid }, notification_type: { type: string }, message: { type: string }, channel: { type: string }, delivery_status: { type: string }, sent_at: { type: string, format: date-time } } }
+
+    SystemSettings: { type: object, properties: { currency: { type: string }, date_format: { type: string }, time_zone: { type: string }, financial_year_start: { type: string, format: date }, receipt_prefix: { type: string }, payment_methods: { type: array, items: { type: string } }, draw_rules: { type: object, additionalProperties: true }, approval_matrix: { type: object, additionalProperties: true }, notification_templates: { type: object, additionalProperties: true } } }
