@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAMS — Ekub & Association Management System</title>
+<meta name="description" content="Multi-association Ekub and Association Management System — technical design package: database schema, API spec, wireframes, test cases, deployment guide.">
+<style>
+  :root{
+    --navy:#0F2A43; --navy-l:#1B3A57; --teal:#1F7A8C; --emerald:#2F9E6B;
+    --bg:#F4F6F8; --card:#FFFFFF; --border:#CBD5E0; --text:#1A2230; --muted:#6B7785;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--text);background:var(--bg);line-height:1.6}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 clamp(1rem,4vw,2rem)}
+  /* hero */
+  header{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-l) 100%);color:#fff;
+         padding:clamp(2.5rem,8vw,5rem) 0;position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;right:-10%;top:-30%;width:50%;height:140%;
+                 background:var(--emerald);opacity:.18;transform:rotate(15deg)}
+  .badge{display:inline-block;font-size:.8rem;font-weight:600;letter-spacing:.08em;
+         text-transform:uppercase;color:var(--emerald);background:rgba(47,158,107,.12);
+         padding:.3rem .8rem;border-radius:999px;margin-bottom:1rem}
+  h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.1;font-weight:800;margin-bottom:.6rem}
+  header p{font-size:clamp(1rem,2.5vw,1.25rem);color:#cdd7e0;max-width:60ch}
+  .hero-meta{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:.5rem}
+  .hero-meta span{font-size:.85rem;background:rgba(255,255,255,.1);padding:.4rem .8rem;
+                  border-radius:6px;border:1px solid rgba(255,255,255,.15)}
+  /* sections */
+  section{padding:clamp(2rem,5vw,3.5rem) 0}
+  section h2{font-size:clamp(1.5rem,4vw,2rem);color:var(--navy);margin-bottom:.4rem;font-weight:700}
+  section .lead{color:var(--muted);margin-bottom:1.5rem;max-width:70ch}
+  /* cards grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+        padding:1.2rem;transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column}
+  .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(15,42,67,.12)}
+  .card .icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;
+              justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:.8rem}
+  .card h3{font-size:1.05rem;color:var(--navy);margin-bottom:.3rem}
+  .card p{font-size:.9rem;color:var(--muted);flex-grow:1;margin-bottom:.8rem}
+  .card a{font-size:.85rem;font-weight:600}
+  /* deliverables table */
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+  table{width:100%;border-collapse:collapse;min-width:560px}
+  th,td{text-align:left;padding:.85rem 1rem;border-bottom:1px solid var(--border);font-size:.9rem}
+  th{background:var(--navy);color:#fff;font-weight:600;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  tr:nth-child(even) td{background:#f8fafc}
+  td a{font-weight:600}
+  td code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:.82rem;
+          background:#eef2f6;padding:.1rem .35rem;border-radius:4px;color:var(--navy-l)}
+  /* model box */
+  .model{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--emerald);
+         border-radius:10px;padding:1.4rem;margin-bottom:1rem}
+  .model h3{color:var(--emerald);font-size:1.05rem;margin-bottom:.5rem}
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;margin-top:1rem}
+  .mode{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:.9rem}
+  .mode .name{font-weight:700;color:var(--navy);font-family:monospace;font-size:.85rem;margin-bottom:.3rem}
+  .mode .desc{font-size:.82rem;color:var(--muted)}
+  /* quickstart */
+  ol{padding-left:1.2rem;color:var(--text)}
+  ol li{margin-bottom:.6rem}
+  pre{background:var(--navy);color:#e6edf3;padding:1rem 1.2rem;border-radius:8px;
+      overflow-x:auto;font-family:monospace;font-size:.85rem;margin:.6rem 0 1rem}
+  pre code{color:inherit;background:none}
+  /* footer */
+  footer{background:var(--navy);color:#9fb3c8;padding:2rem 0;text-align:center;font-size:.85rem}
+  footer a{color:#cdd7e0}
+  .pill{display:inline-block;font-size:.72rem;font-weight:600;padding:.15rem .5rem;border-radius:4px;
+        background:var(--emerald);color:#fff;margin-left:.4rem}
+  @media (max-width:640px){
+    header::before{display:none}
+    .hero-meta{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <span class="badge">Technical Design Package · v1.0</span>
+    <h1>Ekub &amp; Association<br>Management System</h1>
+    <p>A secure, multi-tenant platform that manages the complete lifecycle of associations and their
+       Ekub schemes — from member registration and contribution collection through draws, fund
+       distribution, reconciliation and scheme closure.</p>
+    <div class="hero-meta">
+      <span>Initial Market: Ethiopia</span>
+      <span>Currency: ETB</span>
+      <span>Web + PWA</span>
+      <span>PostgreSQL · Row-Level Security</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Package Contents</h2>
+    <p class="lead">Everything a development team needs to begin implementation — a resolved distribution
+       model, a complete database schema with tenant isolation, an API specification, UI wireframes,
+       test cases, and a deployment guide.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="icon" style="background:var(--teal)">DB</div>
+        <h3>Database Schema</h3>
+        <p>38+ tables, foreign keys, unique constraints, indexes, an immutable audit trigger, and
+           full Row-Level Security tenant isolation.</p>
+        <a href="database/eams_database_schema.sql">View schema SQL →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--navy-l)">SQL</div>
+        <h3>Seed Dataset</h3>
+        <p>Demonstrates both Ekub models with balanced double-entry journals. Verification queries
+           prove the books balance to zero.</p>
+        <a href="database/eams_seed_data.sql">View seed SQL →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--emerald)">API</div>
+        <h3>API Specification</h3>
+        <p>OpenAPI 3.1 — 58 endpoints, 85 schemas, all references validated. Ready for code
+           generation or hand-off.</p>
+        <a href="api/eams_api_spec.yaml">View OpenAPI YAML →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--navy)">PDF</div>
+        <h3>Technical Design</h3>
+        <p>The resolved distribution model, schema walkthrough, financial rules, draw engine, and
+           the maker-checker approval matrix.</p>
+        <a href="docs/EAMS_Technical_Design.pdf">Open PDF →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--teal)">UI</div>
+        <h3>UI Wireframes</h3>
+        <p>All 28 screens from the SRS, each as a labeled wireframe with a field and function list.</p>
+        <a href="docs/EAMS_UI_Wireframes.pdf">Open PDF →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--emerald)">XLS</div>
+        <h3>Test Cases</h3>
+        <p>82 test cases mapped to every SRS §11 acceptance criterion, plus a summary dashboard.</p>
+        <a href="docs/EAMS_Test_Cases.xlsx">Open spreadsheet →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--navy-l)">PDF</div>
+        <h3>Deployment Guide</h3>
+        <p>Docker-based hosting, environment, migrations with RLS, backups, security hardening,
+           monitoring, and a go-live checklist.</p>
+        <a href="docs/EAMS_Deployment_Guide.pdf">Open PDF →</a>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:var(--muted)">&lt;/&gt;</div>
+        <h3>Generator Scripts</h3>
+        <p>The Python scripts that produced the PDFs and spreadsheet — recoverable artifacts for
+           future revisions.</p>
+        <a href="scripts/">Browse scripts →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="background:#fff">
+  <div class="wrap">
+    <h2>Resolved Distribution Model</h2>
+    <p class="lead">The SRS flags how members with different participation levels receive distributions
+       as the single most important design issue. Each scheme selects one of three modes — the draw
+       and distribution engines branch on it, and an entitlement-balance view prevents over-distribution.</p>
+    <div class="model">
+      <h3>Recommended default: equal_rounds</h3>
+      <p>A fixed <code style="font-family:monospace;background:#eef2f6;padding:.1rem .3rem;border-radius:3px">round_value</code>
+         (typically the smallest member target) is paid per round. A member wins exactly enough rounds
+         to satisfy their target, then is excluded. Total distributed always equals total collected
+         equals the sum of targets — so the books balance by construction.</p>
+      <div class="modes">
+        <div class="mode"><div class="name">traditional_pool</div><div class="desc">Full collected pool to one winner. Classic rotating Ekub; each member wins once.</div></div>
+        <div class="mode"><div class="name">equal_rounds</div><div class="desc">Fixed round_value per round. Best for mixed Full / Half / Quarter targets.</div></div>
+        <div class="mode"><div class="name">target_entitlement</div><div class="desc">min(remaining_target, available pool) per round. For variable or irregular collections.</div></div>
+      </div>
+    </div>
+    <p style="font-size:.9rem;color:var(--muted)">The traditional rotating Ekub is the
+       <code style="font-family:monospace">traditional_pool</code> special case. Full details and a
+       worked example are in the <a href="docs/EAMS_Technical_Design.pdf">Technical Design PDF</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Quick Start</h2>
+    <p class="lead">Load the schema and seed into a PostgreSQL 15+ database to explore the model.</p>
+    <ol>
+      <li>Create the database and a least-privilege application role.</li>
+      <li>Load the schema (creates tables, constraints, RLS policies, and audit triggers):</li>
+    </ol>
+<pre><code>psql -d eams -f database/eams_database_schema.sql</code></pre>
+    <ol start="3">
+      <li>Load the demonstration dataset (demonstration environments only — never production):</li>
+    </ol>
+<pre><code>psql -d eams -f database/eams_seed_data.sql</code></pre>
+    <ol start="4">
+      <li>Verify the books balance — every posted journal entry must show <code>balance_difference = 0</code>:</li>
+    </ol>
+<pre><code>SELECT * FROM v_journal_balance_check;</code></pre>
+    <p style="font-size:.9rem;color:var(--muted);margin-top:1rem">For the full Docker-based deployment,
+       TLS, backups, and the go-live checklist, see the
+       <a href="docs/EAMS_Deployment_Guide.pdf">Deployment Guide</a>.</p>
+  </div>
+</section>
+
+<section style="background:#fff">
+  <div class="wrap">
+    <h2>Repository Map</h2>
+    <p class="lead">How this repository is organized.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td><code>database/</code></td><td>PostgreSQL schema and seed SQL</td></tr>
+          <tr><td><code>api/</code></td><td>OpenAPI 3.1 specification</td></tr>
+          <tr><td><code>docs/</code></td><td>Technical design, wireframes, test cases, deployment guide</td></tr>
+          <tr><td><code>scripts/</code></td><td>Python generators for the PDFs and spreadsheet</td></tr>
+          <tr><td><code>.github/workflows/</code></td><td>GitHub Actions workflow that deploys this page to Pages</td></tr>
+          <tr><td><code>index.html</code></td><td>This landing page (GitHub Pages entry)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    EAMS — Ekub &amp; Association Management System · Technical Design Package v1.0<br>
+    Companion to the SRS. <a href="README.md">README</a> · <a href="LICENSE">MIT License</a>
+  </div>
+</footer>
+</body>
+</html>

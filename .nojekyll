@@ -1,0 +1,4 @@
+# Tells GitHub Pages to skip Jekyll processing and serve the repository
+# contents as static files as-is. This ensures dotfiles and folders whose
+# names begin with an underscore are not silently dropped.
+# This site is deployed via the .github/workflows/deploy.yml Actions workflow.
